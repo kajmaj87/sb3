@@ -5,7 +5,7 @@ members = [
 ]
 
 [package]
-name = "space_business3"
+name = "sb3"
 version = "0.1.0"
 edition = "2021"
 
