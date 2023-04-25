@@ -1,0 +1,46 @@
+[workspace]
+members = [
+    ".",
+    "macros"
+]
+
+[package]
+name = "space_business3"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[dependencies]
+macros = { path = "macros" }
+# run with cargo run --features bevy/dynamic_linking instead of inlcuding this feature so CICD works without issue
+bevy = { version = "0.10" }
+bevy_window = { version = "0.10" }
+bevy_asset = { version = "0.10" }
+bevy_render = { version = "0.10" }
+bevy_reflect = { version = "0.10" }
+bevy_derive = "0.10.1"
+# atlas feature is needed for bevy ecs tilemap to work in WASM builds
+bevy_ecs_tilemap = { version = "0.10.0", features = ["atlas"] }
+# open_url and manage_clipboard are disabled as not yet needed
+bevy_egui = { version = "0.20.3", features = ["arboard", "default_fonts", "thread_local", "webbrowser"] }
+bevy_prototype_debug_lines = "0.10.1"
+egui = "0.21"
+egui_dock = "0.4"
+big-brain = "0.17.0"
+enum-display-derive = "0.1.1"
+quickcheck = "1.0.3"
+rand = "0.8.5"
+serde = { version = "1.0.144", features = ["derive"] }
+serde_json = "1.0.85"
+egui_extras = "0.21.0"
+bevy-inspector-egui = "0.18.3"
+
+[dev-dependencies]
+quickcheck_macros = "1.0.0"

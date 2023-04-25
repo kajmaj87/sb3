@@ -1,0 +1,13 @@
+{
+  "game": {
+    "speed": {
+      "value": 1.0,
+      "name": "Game Speed",
+      "description": "How many seconds real time must pass to advance the simulation by one tick",
+      "range": [
+        0.0,
+        10.0
+      ]
+    }
+  }
+}

@@ -1,0 +1,89 @@
+on: [push, pull_request]
+
+name: Continuous integration
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust:
+          - stable
+    steps:
+      - run: |
+          sudo apt-get install -y pkg-config libudev-dev libasound2-dev build-essential alsa \
+          libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ runner.os }}-cargo-check-step
+      - uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --workspace -- -D warnings
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --workspace
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rust:
+          - stable
+        target:
+          - x86_64-unknown-linux-gnu
+          - wasm32-unknown-unknown
+          - x86_64-pc-windows-gnu
+    steps:
+      - run: |
+          sudo apt-get install -y pkg-config libudev-dev libasound2-dev build-essential alsa \
+          libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev mingw-w64
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          target: ${{ matrix.target }}
+          override: true
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ runner.os }}-cargo-build-target-${{ matrix.target }}
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --workspace --release --target ${{ matrix.target }}
+      - run: mv target/${{ matrix.target}}/release/space_business2_riir* .
+      - name: Upload Artifact
+        id: upload-artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: space-business-${{ matrix.target }}
+          path: |
+            space_business2_riir*
+            assets/
+            data/
+            !space_business2_riir.d
+      - name: Notify success on Discord
+        if: success() && matrix.target == 'x86_64-pc-windows-gnu'
+        uses: Ilshidur/action-discord@0.3.2
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_SUCCESS }}
+        with:
+          args: |
+            Build succeeded! :white_check_mark:
+            Commit Message: "${{ github.event.head_commit.message }}"
+            Artifacts: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Status: ${{ job.status }}

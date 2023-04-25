@@ -1,0 +1,9 @@
+
+repos:
+- repo: https://github.com/kajmaj87/pre-commit-rust
+  rev: v1.0
+  hooks:
+  - id: fmt
+  - id: clippy
+  - id: cargo-check
+  - id: cargo-test
