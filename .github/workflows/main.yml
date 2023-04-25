@@ -65,17 +65,17 @@ jobs:
         with:
           command: build
           args: --workspace --release --target ${{ matrix.target }}
-      - run: mv target/${{ matrix.target}}/release/space_business2_riir* .
+      - run: mv target/${{ matrix.target}}/release/sb3* .
       - name: Upload Artifact
         id: upload-artifact
         uses: actions/upload-artifact@v2
         with:
-          name: space-business-${{ matrix.target }}
+          name: sb3-${{ matrix.target }}
           path: |
-            space_business2_riir*
+            sb3*
             assets/
             data/
-            !space_business2_riir.d
+            !sb3.d
       - name: Notify success on Discord
         if: success() && matrix.target == 'x86_64-pc-windows-gnu'
         uses: Ilshidur/action-discord@0.3.2
