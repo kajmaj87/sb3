@@ -3,9 +3,9 @@ use rand::seq::SliceRandom;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
-#[derive(Hash, Eq, PartialEq, Debug, Clone)]
-struct ItemType {
-    name: String,
+#[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
+pub struct ItemType {
+    pub(crate) name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -53,10 +53,10 @@ pub struct Item {
 #[derive(Component, Debug)]
 pub struct SellOrder {
     item: Entity,
-    item_type: ItemType,
+    pub(crate) item_type: ItemType,
     owner: Entity,
-    price: u64,
-    base_price: u64,
+    pub(crate) price: u64,
+    pub(crate) base_price: u64,
 }
 impl PartialEq for SellOrder {
     fn eq(&self, other: &Self) -> bool {
@@ -90,6 +90,7 @@ pub struct SellStrategy {
     // max_margin: f32,
     margin_drop_per_day: f32,
     current_margin: f32,
+    min_margin: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -149,7 +150,7 @@ pub fn init(mut commands: Commands) {
             hired_workers: vec![lumberjack],
         },
         sell_strategy: SellStrategy {
-            // max_margin: 2.0,
+            min_margin: 0.5,
             margin_drop_per_day: 0.1,
             current_margin: 2.0,
         },
@@ -176,7 +177,7 @@ pub fn init(mut commands: Commands) {
             hired_workers: vec![lumberjack],
         },
         sell_strategy: SellStrategy {
-            // max_margin: 2.0,
+            min_margin: 0.5,
             margin_drop_per_day: 0.1,
             current_margin: 2.0,
         },
@@ -237,7 +238,7 @@ pub fn init(mut commands: Commands) {
                 hired_workers: vec![board_maker],
             },
             sell_strategy: SellStrategy {
-                // max_margin: 2.0,
+                min_margin: 0.5,
                 margin_drop_per_day: 0.1,
                 current_margin: 2.0,
             },
@@ -284,9 +285,12 @@ fn execute_production_cycle(
                         .unwrap()
                         .pop()
                         .unwrap();
-                    let item_cost = items_query.get(item).unwrap().buy_cost;
-                    commands.entity(item).despawn_recursive();
-                    cost_per_cycle += item_cost;
+                    if let Ok(item_cost) = items_query.get(item) {
+                        commands.entity(item).despawn_recursive();
+                        cost_per_cycle += item_cost.buy_cost;
+                    } else {
+                        error!("Item not found");
+                    }
                 }
             }
             debug!("Total cost per cycle: {}", cost_per_cycle);
@@ -395,7 +399,9 @@ pub fn create_sell_orders(
                     item,
                     item_type: item_cost.item_type.clone(),
                     owner: seller,
-                    price: (item_cost.production_cost as f32 * strategy.current_margin) as u64,
+                    price: (item_cost.production_cost as f32
+                        * strategy.current_margin.max(strategy.min_margin))
+                        as u64,
                     base_price: item_cost.production_cost,
                 };
                 debug!("Created sell order {:?} for {}", sell_order, name.as_str());
@@ -416,7 +422,9 @@ pub fn update_sell_order_prices(
 ) {
     for (_, name, mut sell_order, mut sell_strategy) in sell_orders.iter_mut() {
         sell_strategy.current_margin -= sell_strategy.margin_drop_per_day;
-        sell_order.price = (sell_order.base_price as f32 * sell_strategy.current_margin) as u64;
+        sell_order.price = (sell_order.base_price as f32
+            * sell_strategy.current_margin.max(sell_strategy.min_margin))
+            as u64;
         debug!(
             "Updated {} sell order price to {}",
             name.as_str(),

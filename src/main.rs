@@ -6,7 +6,9 @@ mod user_input;
 
 use bevy::log::LogPlugin;
 use std::any::TypeId;
+use std::collections::BTreeMap;
 
+use crate::business::SellOrder;
 use crate::config::Config;
 use bevy::prelude::*;
 use bevy_asset::{HandleId, ReflectAsset};
@@ -125,7 +127,7 @@ fn next_turn(days: Res<Days>) -> bool {
 fn show_ui_system(world: &mut World) {
     let Ok(egui_context) = world
         .query_filtered::<&mut EguiContext, With<PrimaryWindow>>()
-        .get_single(world) else { return };
+        .get_single(world) else { return; };
     let mut egui_context = egui_context.clone();
 
     world.resource_scope::<UiState, _>(|world, mut ui_state| {
@@ -142,7 +144,7 @@ fn set_camera_viewport(
 ) {
     let mut cam = cameras.single_mut();
 
-    let Ok(window) = primary_window.get_single() else { return };
+    let Ok(window) = primary_window.get_single() else { return; };
 
     let scale_factor = window.scale_factor() * egui_settings.scale_factor;
 
@@ -235,6 +237,47 @@ impl egui_dock::TabViewer for TabViewer<'_> {
             EguiWindow::Days => {
                 ui.label(format!("Days: {}", self.world.resource::<Days>().days));
                 ui.label(format!("Count: {}", self.world.resource::<Counter>().0));
+                let mut grouped_orders = BTreeMap::new();
+
+                for sell_order in self.world.query::<&SellOrder>().iter(self.world) {
+                    grouped_orders
+                        .entry(sell_order.item_type.clone())
+                        .or_insert_with(Vec::new)
+                        .push(sell_order.price);
+                }
+
+                for (item_type, prices) in grouped_orders {
+                    let len = prices.len();
+                    let mut prices = prices;
+                    prices.sort_unstable();
+
+                    let min = *prices.first().unwrap();
+                    let max = *prices.last().unwrap();
+                    let median = prices[len / 2];
+                    let p10 = prices[(len as f32 * 0.1).round() as usize];
+                    let p90 = prices[(len as f32 * 0.9).round() as usize];
+
+                    ui.label(format!(
+                        "ItemType: {}\nMin: {} p10: {} Median: {} p90: {} Max: {}, total: {}",
+                        item_type.name, min, p10, median, p90, max, len
+                    ));
+                }
+                // let mut prices: Vec<u64> = self.world.query::<(Entity, &SellOrder)>()
+                //     .iter(&self.world)
+                //     .map(|(_, sell_order)| sell_order.base_price)
+                //     .collect();
+                //
+                // prices.sort_unstable();
+                //
+                // let len = prices.len();
+                // if len > 0 {
+                //     let min = *prices.first().unwrap_or(&0);
+                //     let max = *prices.last().unwrap_or(&0);
+                //     let median = prices[len / 2];
+                //     let p10 = prices[len / 10];
+                //     let p90 = prices[9 * len / 10];
+                //     ui.label(format!("Min: {} p10: {} Median: {} p90: {} Max: {}, total orders: {}", min, p10, median, p90, max, len));
+                // }
             }
             EguiWindow::GameView => {
                 *self.viewport_rect = ui.clip_rect();
@@ -490,67 +533,3 @@ fn setup(
         // PickRaycastSource,
     ));
 }
-// use bevy::prelude::*;
-// use bevy::log::LogPlugin;
-// use bevy_egui::{EguiContext, EguiContexts, EguiPlugin};
-// use egui_dock::{NodeIndex, Tree};
-//
-// fn main() {
-//     App::new()
-//         .add_plugins(
-//             DefaultPlugins
-//                 .set(ImagePlugin::default_nearest())
-//                 .set(LogPlugin {
-//                     filter: "info,wgpu_core=warn,wgpu_hal=warn,space_business2_riir=warn".into(),
-//                     level: bevy::log::Level::WARN,
-//                 }),
-//         )
-//         .add_plugin(EguiPlugin)
-//         .add_system(gui)
-//         .run();
-// }
-//
-// fn gui(mut egui_context: EguiContexts) {
-//     egui::
-//     egui::Window::new("Config").show(egui_context.ctx_mut(), |ui| {
-//         let mut my_tabs = MyTabs::new();
-//         my_tabs.ui(ui);
-//     });
-// }
-//
-// struct MyTabs {
-//     tree: Tree<String>
-// }
-//
-// impl MyTabs {
-//     pub fn new() -> Self {
-//         let tab1 = "tab1".to_string();
-//         let tab2 = "tab2".to_string();
-//
-//         let mut tree = Tree::new(vec![tab1]);
-//         tree.split_left(NodeIndex::root(), 0.20, vec![tab2]);
-//
-//         Self { tree }
-//     }
-//
-//     fn ui(&mut self, ui: &mut egui::Ui) {
-//         let style = egui_dock::Style::from_egui(ui.style().as_ref());
-//         egui_dock::DockArea::new(&mut self.tree)
-//             .style(style)
-//             .show_inside(ui, &mut TabViewer {});
-//     }
-// }
-//
-// struct TabViewer {}
-//
-// impl egui_dock::TabViewer for TabViewer {
-//     type Tab = String;
-//
-//     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
-//         ui.label(format!("Content of {tab}"));
-//     }
-//
-//     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
-//         (&*tab).into()
-//     }
-// }
