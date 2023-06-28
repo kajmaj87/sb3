@@ -6,7 +6,7 @@ mod user_input;
 
 use bevy::log::LogPlugin;
 use std::any::TypeId;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::business::SellOrder;
 use crate::config::Config;
@@ -22,6 +22,8 @@ use bevy_inspector_egui::DefaultInspectorConfigPlugin;
 use bevy_reflect::TypeRegistry;
 use bevy_render::camera::Viewport;
 use bevy_window::PrimaryWindow;
+use egui::plot::{Bar, BarChart, Corner, Legend, Plot};
+use egui::Color32;
 use egui_dock::{NodeIndex, Tree};
 
 fn main() {
@@ -258,9 +260,22 @@ impl egui_dock::TabViewer for TabViewer<'_> {
                     let p90 = prices[(len as f32 * 0.9).round() as usize];
 
                     ui.label(format!(
-                        "ItemType: {}\nMin: {} p10: {} Median: {} p90: {} Max: {}, total: {}",
-                        item_type.name, min, p10, median, p90, max, len
+                        "ItemType: {}\nMin: {} p10: {} Median: {} p90: {} Max: {}, total: {}, avg. {}",
+                        item_type.name, min, p10, median, p90, max, len, prices.iter().sum::<u64>() / len as u64
                     ));
+                    Plot::new(item_type.name.clone())
+                        .view_aspect(2.0)
+                        .legend(Legend {
+                            position: Corner::LeftTop,
+                            ..default()
+                        })
+                        .show(ui, |plot_ui| {
+                            plot_ui.bar_chart(create_histogram(
+                                format!("{} prices", item_type.name).as_str(),
+                                &prices,
+                                20,
+                            ));
+                        });
                 }
                 // let mut prices: Vec<u64> = self.world.query::<(Entity, &SellOrder)>()
                 //     .iter(&self.world)
@@ -326,6 +341,26 @@ impl egui_dock::TabViewer for TabViewer<'_> {
     fn clear_background(&self, window: &Self::Tab) -> bool {
         !matches!(window, EguiWindow::GameView)
     }
+}
+
+pub fn create_histogram(name: &str, values: &[u64], bins: u32) -> BarChart {
+    let mut histogram = HashMap::new();
+    let max = values.iter().max().unwrap_or(&0);
+    let min = values.iter().min().unwrap_or(&0);
+    let range = max - min + 1;
+    let bin_width = (range as f64 / bins as f64).ceil() as u64;
+    for &value in values {
+        *histogram.entry((value - min) / bin_width).or_insert(0) += 1;
+    }
+    let histogram: Vec<Bar> = histogram
+        .into_iter()
+        .map(|(bin, count)| {
+            Bar::new((bin * bin_width + min) as f64, count as f64).width(bin_width as f64)
+        })
+        .collect();
+    BarChart::new(histogram)
+        .color(Color32::LIGHT_BLUE)
+        .name(name)
 }
 
 fn select_resource(

@@ -122,10 +122,10 @@ pub enum MaxCycleError {
 
 pub fn init(mut commands: Commands) {
     let board_maker = commands
-        .spawn((Worker { salary: 100 }, Name::new("Board maker")))
+        .spawn((Worker { salary: 1000 }, Name::new("Board maker")))
         .id();
     let lumberjack = commands
-        .spawn((Worker { salary: 60 }, Name::new("Lumberjack")))
+        .spawn((Worker { salary: 600 }, Name::new("Lumberjack")))
         .id();
     // spawn lumberjack
     commands.spawn(ManufacturerBundle {
@@ -145,7 +145,7 @@ pub fn init(mut commands: Commands) {
             assets: Inventory {
                 items: HashMap::new(),
                 items_to_sell: HashSet::new(),
-                money: 2000,
+                money: 20000,
             },
             hired_workers: vec![lumberjack],
         },
@@ -172,7 +172,7 @@ pub fn init(mut commands: Commands) {
             assets: Inventory {
                 items: HashMap::new(),
                 items_to_sell: HashSet::new(),
-                money: 2000,
+                money: 20000,
             },
             hired_workers: vec![lumberjack],
         },
@@ -183,71 +183,73 @@ pub fn init(mut commands: Commands) {
         },
     });
 
-    // spawn wooden board manufacturer
-    let mut items = HashMap::new();
-    let mut items_in_inventory = vec![];
-    for _ in 0..2 {
-        let item = commands
-            .spawn((
-                Item {
-                    item_type: ItemType {
-                        name: "wood".to_string(),
-                    },
-                    production_cost: 0,
-                    buy_cost: 20,
-                    // owner: Entity::new(0),
-                },
-                Name::new("Wood"),
-            ))
-            .id();
-        items_in_inventory.push(item);
-    }
-    items.insert(
-        ItemType {
-            name: "wood".to_string(),
-        },
-        items_in_inventory,
-    );
-    let mut input = HashMap::new();
-    input.insert(
-        ItemType {
-            name: "wood".to_string(),
-        },
-        1,
-    );
-    commands.spawn((
-        ManufacturerBundle {
-            name: Name::new("Wooden board manufacturer"),
-            manufacturer: Manufacturer {
-                production_cycle: ProductionCycle {
-                    input,
-                    output: (
-                        ItemType {
-                            name: "boards".to_string(),
+    for _ in 0..10 {
+        // spawn wooden board manufacturer
+        let mut items = HashMap::new();
+        let mut items_in_inventory = vec![];
+        for _ in 0..2 {
+            let item = commands
+                .spawn((
+                    Item {
+                        item_type: ItemType {
+                            name: "wood".to_string(),
                         },
-                        10,
-                    ),
-                    // tools: HashMap::new(),
-                    workdays_needed: 1,
-                },
-                assets: Inventory {
-                    items,
-                    items_to_sell: HashSet::new(),
-                    money: 5000,
-                },
-                hired_workers: vec![board_maker],
+                        production_cost: 0,
+                        buy_cost: 20,
+                        // owner: Entity::new(0),
+                    },
+                    Name::new("Wood"),
+                ))
+                .id();
+            items_in_inventory.push(item);
+        }
+        items.insert(
+            ItemType {
+                name: "wood".to_string(),
             },
-            sell_strategy: SellStrategy {
-                min_margin: 0.5,
-                margin_drop_per_day: 0.1,
-                current_margin: 2.0,
+            items_in_inventory,
+        );
+        let mut input = HashMap::new();
+        input.insert(
+            ItemType {
+                name: "wood".to_string(),
             },
-        },
-        BuyStrategy {
-            target_production_cycles: 3,
-            outstanding_orders: 0,
-        },
-    ));
+            1,
+        );
+        commands.spawn((
+            ManufacturerBundle {
+                name: Name::new("Wooden board manufacturer"),
+                manufacturer: Manufacturer {
+                    production_cycle: ProductionCycle {
+                        input,
+                        output: (
+                            ItemType {
+                                name: "boards".to_string(),
+                            },
+                            10,
+                        ),
+                        // tools: HashMap::new(),
+                        workdays_needed: 1,
+                    },
+                    assets: Inventory {
+                        items,
+                        items_to_sell: HashSet::new(),
+                        money: 50000,
+                    },
+                    hired_workers: vec![board_maker],
+                },
+                sell_strategy: SellStrategy {
+                    min_margin: 0.5,
+                    margin_drop_per_day: 0.1,
+                    current_margin: 2.0,
+                },
+            },
+            BuyStrategy {
+                target_production_cycles: 3,
+                outstanding_orders: 0,
+            },
+        ));
+    }
 }
 
 pub fn produce(
