@@ -20,7 +20,7 @@ opt-level = 3
 [dependencies]
 macros = { path = "macros" }
 # run with cargo run --features bevy/dynamic_linking instead of inlcuding this feature so CICD works without issue
-bevy = { version = "0.10" }
+bevy = { version = "0.10.1" }
 bevy_window = { version = "0.10" }
 bevy_asset = { version = "0.10" }
 bevy_render = { version = "0.10" }
@@ -44,3 +44,7 @@ bevy-inspector-egui = "0.18.3"
 
 [dev-dependencies]
 quickcheck_macros = "1.0.0"
+
+#[[test]]
+#name = "business_tests"
+#path = "tests/business_tests.rs"

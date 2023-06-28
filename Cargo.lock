@@ -3023,6 +3023,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "sb3"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy-inspector-egui",
+ "bevy_asset",
+ "bevy_derive",
+ "bevy_ecs_tilemap",
+ "bevy_egui",
+ "bevy_prototype_debug_lines",
+ "bevy_reflect",
+ "bevy_render",
+ "bevy_window",
+ "big-brain",
+ "egui",
+ "egui_dock",
+ "egui_extras",
+ "enum-display-derive",
+ "macros",
+ "quickcheck",
+ "quickcheck_macros",
+ "rand",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "scopeguard"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3105,33 +3132,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a507befe795404456341dfab10cef66ead4c041f62b8b11bbb92bffe5d0953e0"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "space_business3"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy-inspector-egui",
- "bevy_asset",
- "bevy_derive",
- "bevy_ecs_tilemap",
- "bevy_egui",
- "bevy_prototype_debug_lines",
- "bevy_reflect",
- "bevy_render",
- "bevy_window",
- "big-brain",
- "egui",
- "egui_dock",
- "egui_extras",
- "enum-display-derive",
- "macros",
- "quickcheck",
- "quickcheck_macros",
- "rand",
- "serde",
- "serde_json",
 ]
 
 [[package]]

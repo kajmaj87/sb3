@@ -1,0 +1,52 @@
+erDiagram
+    Item ||--|| ProductionCost: has
+    Item ||--|| Owner: has
+    Item ||--|| ItemType: is
+    Item ||--|| Physical: is
+    Item ||--o| Degradable: is
+    Item ||--o| Repairable: is
+
+    Worker ||--|| Salary: has
+    Worker ||--|| WorksAt: has
+    Worker ||--|| Inventory: has
+
+    Business ||--|| Workplace: is
+    Business ||--|| ProductionCycle: has
+    Business ||--|| Inventory: has
+    ProductionCycle ||--o{ Item: inputs
+    ProductionCycle ||--|{ Item: outputs
+    Workplace ||--|{ Worker: "has workers"
+
+    Owner {
+        u32 entity_id
+    }
+    Physical {
+        f32 volume
+        f32 weight
+    }
+    ItemType {
+        string name
+    }
+    Inventory {
+        map[type][vec(u32)] items
+        u64 credits
+    }
+    ProductionCost {
+        u64 variable_cost "Resource and labour costs"
+        u64 fixed_cost "Rent, utilities, etc."
+    }
+    ProductionCycle {
+        vec(u32) input "References item ids"
+        vec(u32) output "References item ids"
+        u64 work_days
+    }
+    Salary {
+        u64 credits_per_day
+    }
+    WorksAt {
+        u32 entity_id
+    }
+    Workplace {
+        vec(u32) workers
+    }
+

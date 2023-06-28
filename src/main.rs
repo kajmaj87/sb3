@@ -1,6 +1,10 @@
+mod business;
 mod config;
+mod money;
+mod people;
 mod user_input;
 
+use bevy::log::LogPlugin;
 use std::any::TypeId;
 
 use crate::config::Config;
@@ -20,7 +24,10 @@ use egui_dock::{NodeIndex, Tree};
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(LogPlugin {
+            filter: "info,wgpu_core=warn,wgpu_hal=warn,sb3=debug".into(),
+            level: bevy::log::Level::WARN,
+        }))
         .add_plugin(DefaultInspectorConfigPlugin)
         .add_plugin(bevy_egui::EguiPlugin)
         .add_plugin(config::ConfigPlugin)
@@ -59,7 +66,13 @@ fn main() {
                 .in_base_set(CoreSet::PreUpdate),
         )
         .add_system(count_system.run_if(next_turn))
+        .add_system(business::produce.run_if(next_turn))
+        .add_system(business::create_sell_orders.run_if(next_turn))
+        .add_system(business::update_sell_order_prices.run_if(next_turn))
+        .add_system(business::create_buy_orders.run_if(next_turn))
+        .add_system(business::execute_orders_for_manufacturers.run_if(next_turn))
         .add_system(turn_end_system.in_base_set(CoreSet::PostUpdate))
+        .add_startup_system(business::init)
         .register_type::<Option<Handle<Image>>>()
         .register_type::<AlphaMode>()
         .run();
