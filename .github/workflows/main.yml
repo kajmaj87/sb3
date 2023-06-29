@@ -6,14 +6,13 @@ jobs:
   check:
     name: Check
     runs-on: ubuntu-latest
+    container:
+      image: docker://kajmaj87/rust-builder:latest
     strategy:
       matrix:
         rust:
           - stable
     steps:
-      - run: |
-          sudo apt-get install -y pkg-config libudev-dev libasound2-dev build-essential alsa \
-          libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
@@ -38,6 +37,8 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    container:
+      image: docker://kajmaj87/rust-builder:latest
     strategy:
       fail-fast: false
       matrix:
@@ -48,9 +49,6 @@ jobs:
 #          - wasm32-unknown-unknown
           - x86_64-pc-windows-gnu
     steps:
-      - run: |
-          sudo apt-get install -y pkg-config libudev-dev libasound2-dev build-essential alsa \
-          libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev mingw-w64
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
