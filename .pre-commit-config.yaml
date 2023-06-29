@@ -7,3 +7,11 @@ repos:
   - id: clippy
   - id: cargo-check
   - id: cargo-test
+- repo: local
+  hooks:
+  - id: cargo-outdated
+    name: cargo outdated
+    entry: cargo outdated -R --exit-code 1 || (echo "Dependencies need to be updated; run 'cargo update'" && exit 1)
+    language: system
+    types: [rust]
+    pass_filenames: false
