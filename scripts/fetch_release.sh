@@ -4,6 +4,7 @@
 REPO="kajmaj87/sb3"
 TOKEN=$GH_TOKEN
 ARTIFACT_NAME="sb3-x86_64-unknown-linux-gnu"
+UNPACK_DIR=/tmp/sb3
 
 # Get the last successful run
 RUN_ID=$(curl -s -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github.v3+json" \
@@ -23,11 +24,12 @@ ARTIFACT_URL=$(echo $RAW_RESPONSE | jq -r ".artifacts[] | select(.name==\"$ARTIF
 echo "Artifact URL: $ARTIFACT_URL"
 
 # Download artifact
-curl -L -o artifact.zip -H "Authorization: token $TOKEN" "$ARTIFACT_URL"
+mkdir -p $UNPACK_DIR
+curl -L -o $UNPACK_DIR/artifact.zip -H "Authorization: token $TOKEN" "$ARTIFACT_URL"
 
-# Unzip and set permissions
-unzip artifact.zip
-chmod +x sb3
+# Unzip without asking about overrides into $UNPACK_DIR
+unzip -o $UNPACK_DIR/artifact.zip -d $UNPACK_DIR
+chmod +x $UNPACK_DIR/sb3
 
 # Run the binary
-./sb3
+$UNPACK_DIR/sb3
