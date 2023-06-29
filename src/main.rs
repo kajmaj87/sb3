@@ -2,6 +2,7 @@ mod business;
 mod config;
 mod money;
 mod people;
+mod stats;
 mod ui;
 mod user_input;
 
@@ -24,6 +25,7 @@ fn main() {
             last_update: 0.0,
         })
         .insert_resource(Counter(0))
+        .insert_resource(stats::PriceHistory::default())
         .add_system(user_input::input_system.in_base_set(CoreSet::First))
         .add_system(
             date_update_system
@@ -36,8 +38,10 @@ fn main() {
         .add_system(business::update_sell_order_prices.run_if(next_turn))
         .add_system(business::create_buy_orders.run_if(next_turn))
         .add_system(business::execute_orders_for_manufacturers.run_if(next_turn))
+        .add_system(stats::add_sell_orders_to_history.run_if(next_turn))
         .add_system(turn_end_system.in_base_set(CoreSet::PostUpdate))
-        .add_system(ui::render_prices)
+        .add_system(ui::render_todays_prices)
+        .add_system(ui::render_price_history)
         .add_startup_system(business::init)
         .run();
 }
