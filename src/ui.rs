@@ -119,14 +119,14 @@ pub fn render_price_history(history: Res<PriceHistory>, mut egui_context: EguiCo
                     ui.line(
                         Line::new(PlotPoints::new(points))
                             .color(string_to_rgb(item_type.name.as_str()))
-                            .name(item_type.name.as_str()),
+                            .name(format!("avg of {}", item_type.name.as_str())),
                     );
                 }
                 for (item_type, points) in line_p25 {
                     ui.line(
                         Line::new(PlotPoints::new(points))
                             .color(string_to_rgb(item_type.name.as_str()))
-                            .name(item_type.name.as_str())
+                            .name(format!("p25 of {}", item_type.name.as_str()))
                             .style(LineStyle::Dashed { length: 7.0 }),
                     );
                 }
@@ -134,7 +134,7 @@ pub fn render_price_history(history: Res<PriceHistory>, mut egui_context: EguiCo
                     ui.line(
                         Line::new(PlotPoints::new(points))
                             .color(string_to_rgb(item_type.name.as_str()))
-                            .name(item_type.name.as_str())
+                            .name(format!("p75 of {}", item_type.name.as_str()))
                             .style(LineStyle::Dashed { length: 7.0 }),
                     );
                 }
