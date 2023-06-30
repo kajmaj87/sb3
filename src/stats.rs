@@ -42,8 +42,8 @@ pub fn add_sell_orders_to_history(
         let min = *prices.first().unwrap();
         let max = *prices.last().unwrap();
         let median = prices[prices.len() / 2];
-        let p25 = prices[(prices.len() as f32 * 0.25).round() as usize];
-        let p75 = prices[(prices.len() as f32 * 0.75).round() as usize];
+        let p25 = prices[(prices.len() as f32 * 0.25).floor() as usize];
+        let p75 = prices[(prices.len() as f32 * 0.75).floor() as usize];
         let len = prices.len();
         let avg = prices.iter().sum::<u64>() / len as u64;
 
