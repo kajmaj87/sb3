@@ -1,3 +1,4 @@
+use crate::money::Money;
 use bevy::prelude::*;
 use rand::seq::SliceRandom;
 use std::cmp::Ordering;
@@ -19,7 +20,7 @@ struct ProductionCycle {
 pub struct Inventory {
     items: HashMap<ItemType, Vec<Entity>>,
     items_to_sell: HashSet<Entity>,
-    money: u64,
+    money: Money,
 }
 
 #[derive(Bundle)]
@@ -38,15 +39,15 @@ pub struct Manufacturer {
 
 #[derive(Component)]
 pub struct Worker {
-    salary: u64,
+    salary: Money,
     // employer: Entity,
 }
 
 #[derive(Component, Debug)]
 pub struct Item {
     item_type: ItemType,
-    production_cost: u64,
-    buy_cost: u64,
+    production_cost: Money,
+    buy_cost: Money,
     // owner: Entity,
 }
 
@@ -55,8 +56,8 @@ pub struct SellOrder {
     item: Entity,
     pub(crate) item_type: ItemType,
     owner: Entity,
-    pub(crate) price: u64,
-    pub(crate) base_price: u64,
+    pub(crate) price: Money,
+    pub(crate) base_price: Money,
 }
 impl PartialEq for SellOrder {
     fn eq(&self, other: &Self) -> bool {
@@ -122,16 +123,31 @@ pub enum MaxCycleError {
 
 pub fn init(mut commands: Commands) {
     let board_maker = commands
-        .spawn((Worker { salary: 1000 }, Name::new("Board maker")))
+        .spawn((
+            Worker {
+                salary: Money(1000),
+            },
+            Name::new("Board maker"),
+        ))
         .id();
     let lumberjack = commands
-        .spawn((Worker { salary: 600 }, Name::new("Lumberjack")))
+        .spawn((Worker { salary: Money(600) }, Name::new("Lumberjack")))
         .id();
     let furniture_maker = commands
-        .spawn((Worker { salary: 1500 }, Name::new("Furniture maker")))
+        .spawn((
+            Worker {
+                salary: Money(1500),
+            },
+            Name::new("Furniture maker"),
+        ))
         .id();
     let furniture_maker_2 = commands
-        .spawn((Worker { salary: 1200 }, Name::new("Furniture maker")))
+        .spawn((
+            Worker {
+                salary: Money(1200),
+            },
+            Name::new("Furniture maker"),
+        ))
         .id();
     // spawn lumberjack
     commands.spawn(ManufacturerBundle {
@@ -151,7 +167,7 @@ pub fn init(mut commands: Commands) {
             assets: Inventory {
                 items: HashMap::new(),
                 items_to_sell: HashSet::new(),
-                money: 20000,
+                money: Money(20000),
             },
             hired_workers: vec![lumberjack],
         },
@@ -178,7 +194,7 @@ pub fn init(mut commands: Commands) {
             assets: Inventory {
                 items: HashMap::new(),
                 items_to_sell: HashSet::new(),
-                money: 20000,
+                money: Money(20000),
             },
             hired_workers: vec![lumberjack],
         },
@@ -200,8 +216,8 @@ pub fn init(mut commands: Commands) {
                         item_type: ItemType {
                             name: "wood".to_string(),
                         },
-                        production_cost: 0,
-                        buy_cost: 20,
+                        production_cost: Money(0),
+                        buy_cost: Money(20),
                         // owner: Entity::new(0),
                     },
                     Name::new("Wood"),
@@ -240,7 +256,7 @@ pub fn init(mut commands: Commands) {
                     assets: Inventory {
                         items,
                         items_to_sell: HashSet::new(),
-                        money: 50000,
+                        money: Money(50000),
                     },
                     hired_workers: vec![board_maker],
                 },
@@ -281,7 +297,7 @@ pub fn init(mut commands: Commands) {
                 assets: Inventory {
                     items: HashMap::new(),
                     items_to_sell: HashSet::new(),
-                    money: 100000,
+                    money: Money(100000),
                 },
                 hired_workers: vec![furniture_maker, furniture_maker_2],
             },
@@ -343,7 +359,7 @@ fn execute_production_cycle(
             }
             debug!("Total cost per cycle: {}", cost_per_cycle);
 
-            if (manufacturer.assets.money as i64 - cost_per_cycle as i64) < 0 {
+            if manufacturer.assets.money < cost_per_cycle {
                 debug!("Not enough money to run a cycle, nothing will be produced");
                 return;
             }
@@ -356,7 +372,7 @@ fn execute_production_cycle(
                 let item = Item {
                     item_type: output_material.clone(),
                     production_cost: unit_cost,
-                    buy_cost: 0,
+                    buy_cost: Money(0),
                     // owner: manufacturer_id,
                 };
                 debug!("Produced {:?}", item);
@@ -387,7 +403,7 @@ fn execute_production_cycle(
 fn calculate_max_cycles(
     manufacturer: &Manufacturer,
     workers_query: &Query<&Worker>,
-) -> Result<(u32, u64), MaxCycleError> {
+) -> Result<(u32, Money), MaxCycleError> {
     let mut max_cycles = u32::MAX;
 
     for (input_material, &quantity_needed) in manufacturer.production_cycle.input.iter() {
@@ -417,13 +433,13 @@ fn calculate_max_cycles(
     }
 
     // Calculate the cost per cycle
-    let mut cost_per_cycle = 0;
+    let mut cost_per_cycle = Money(0);
     for worker in manufacturer.hired_workers.iter() {
         cost_per_cycle += workers_query.get(*worker).unwrap().salary;
     }
     debug!("Salaries cost per cycle: {}", cost_per_cycle);
 
-    if (manufacturer.assets.money as i64 - cost_per_cycle as i64) < 0 {
+    if manufacturer.assets.money < cost_per_cycle {
         debug!("Dear Lord, we can't even pay our workers, we're doomed!");
         return Err(MaxCycleError::CantPayWorkers);
     }
@@ -447,9 +463,8 @@ pub fn create_sell_orders(
                     item,
                     item_type: item_cost.item_type.clone(),
                     owner: seller,
-                    price: (item_cost.production_cost as f32
-                        * strategy.current_margin.max(strategy.min_margin))
-                        as u64,
+                    price: item_cost.production_cost
+                        * strategy.current_margin.max(strategy.min_margin),
                     base_price: item_cost.production_cost,
                 };
                 debug!("Created sell order {:?} for {}", sell_order, name.as_str());
@@ -470,9 +485,8 @@ pub fn update_sell_order_prices(
 ) {
     for (_, name, mut sell_order, mut sell_strategy) in sell_orders.iter_mut() {
         sell_strategy.current_margin -= sell_strategy.margin_drop_per_day;
-        sell_order.price = (sell_order.base_price as f32
-            * sell_strategy.current_margin.max(sell_strategy.min_margin))
-            as u64;
+        sell_order.price =
+            sell_order.base_price * sell_strategy.current_margin.max(sell_strategy.min_margin);
         debug!(
             "Updated {} sell order price to {}",
             name.as_str(),

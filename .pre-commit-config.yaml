@@ -1,9 +1,17 @@
 
 repos:
+- repo: local
+  hooks:
+    - id: double-fmt-and-check
+      name: double fmt and check
+      entry: bash -c 'cargo fmt -- --check || (echo "Formatting failed, retrying" && cargo fmt -- --check)'
+      language: system
+      types: [rust]
+      pass_filenames: false
 - repo: https://github.com/kajmaj87/pre-commit-rust
   rev: v1.0
   hooks:
-  - id: fmt
+#  - id: fmt
   - id: clippy
   - id: cargo-check
   - id: cargo-test

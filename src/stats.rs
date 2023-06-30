@@ -1,4 +1,5 @@
 use crate::business::{ItemType, SellOrder};
+use crate::money::Money;
 use crate::Days;
 use bevy::prelude::{debug, Query, Res, ResMut, Resource};
 use std::collections::{BTreeMap, HashMap};
@@ -39,13 +40,13 @@ pub fn add_sell_orders_to_history(
         let mut prices = sell_order.iter().map(|o| o.price).collect::<Vec<_>>();
         prices.sort_unstable();
 
-        let min = *prices.first().unwrap();
-        let max = *prices.last().unwrap();
-        let median = prices[prices.len() / 2];
-        let p25 = prices[(prices.len() as f32 * 0.25).floor() as usize];
-        let p75 = prices[(prices.len() as f32 * 0.75).floor() as usize];
+        let min = prices.first().unwrap().as_u64();
+        let max = prices.last().unwrap().as_u64();
+        let median = prices[prices.len() / 2].as_u64();
+        let p25 = prices[(prices.len() as f32 * 0.25).floor() as usize].as_u64();
+        let p75 = prices[(prices.len() as f32 * 0.75).floor() as usize].as_u64();
         let len = prices.len();
-        let avg = prices.iter().sum::<u64>() / len as u64;
+        let avg = (prices.iter().sum::<Money>() / len).as_u64();
 
         let stats = PriceStats {
             item_type: item_type.clone(),

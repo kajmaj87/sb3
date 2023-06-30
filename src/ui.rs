@@ -1,4 +1,5 @@
 use crate::business::{ItemType, SellOrder};
+use crate::money::Money;
 use crate::stats::PriceHistory;
 use crate::{BuildInfo, Days};
 use bevy::prelude::{Query, Res};
@@ -81,13 +82,13 @@ pub fn render_todays_prices(mut egui_context: EguiContexts, sell_orders: Query<&
             let mut prices = prices;
             prices.sort_unstable();
 
-            let min = *prices.first().unwrap();
-            let max = *prices.last().unwrap();
-            let median = prices[len / 2];
-            let p25 = prices[(len as f32 * 0.25).floor() as usize];
-            let p75 = prices[(len as f32 * 0.75).floor() as usize];
+            let min = prices.first().unwrap().as_u64();
+            let max = prices.last().unwrap().as_u64();
+            let median = prices[len / 2].as_u64();
+            let p25 = prices[(len as f32 * 0.25).floor() as usize].as_u64();
+            let p75 = prices[(len as f32 * 0.75).floor() as usize].as_u64();
             let len = prices.len();
-            let avg = prices.iter().sum::<u64>() / len as u64;
+            let avg = (prices.iter().sum::<Money>() / len).as_u64();
             box_plots.push(create_box_plot(
                 &item_type, i, min, p25, median, p75, max, len, avg,
             ));
