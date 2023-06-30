@@ -76,9 +76,14 @@ jobs:
             sb3*
             assets/
             data/
+            build_info.json
             !sb3.d
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [check, build]  # notify job depends on check and build jobs
+    steps:
       - name: Notify success on Discord
-        if: success() && matrix.target == 'x86_64-pc-windows-gnu'
         uses: Ilshidur/action-discord@0.3.2
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_SUCCESS }}

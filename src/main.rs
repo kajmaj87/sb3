@@ -2,6 +2,7 @@ mod business;
 mod config;
 mod money;
 mod people;
+mod stats;
 mod ui;
 mod user_input;
 
@@ -9,8 +10,22 @@ use crate::config::Config;
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use bevy_egui::EguiPlugin;
+use serde::Deserialize;
+use serde_json::from_reader;
+use std::fs::File;
+
+#[derive(Deserialize, Resource, Debug)]
+pub struct BuildInfo {
+    timestamp: String,
+    version: String,
+    commit_hash: String,
+    branch_name: String,
+}
 
 fn main() {
+    let file = File::open("build_info.json").expect("Failed to open file");
+    let info: BuildInfo = from_reader(file).expect("Failed to deserialize");
+    info!("Build Info: {:?}", info);
     App::new()
         .add_plugins(DefaultPlugins.set(LogPlugin {
             filter: "info,wgpu_core=warn,wgpu_hal=warn,sb3=debug".into(),
@@ -24,6 +39,8 @@ fn main() {
             last_update: 0.0,
         })
         .insert_resource(Counter(0))
+        .insert_resource(stats::PriceHistory::default())
+        .insert_resource(info)
         .add_system(user_input::input_system.in_base_set(CoreSet::First))
         .add_system(
             date_update_system
@@ -36,8 +53,11 @@ fn main() {
         .add_system(business::update_sell_order_prices.run_if(next_turn))
         .add_system(business::create_buy_orders.run_if(next_turn))
         .add_system(business::execute_orders_for_manufacturers.run_if(next_turn))
+        .add_system(stats::add_sell_orders_to_history.run_if(next_turn))
         .add_system(turn_end_system.in_base_set(CoreSet::PostUpdate))
-        .add_system(ui::render_prices)
+        .add_system(ui::render_panels)
+        .add_system(ui::render_todays_prices)
+        .add_system(ui::render_price_history)
         .add_startup_system(business::init)
         .run();
 }

@@ -127,6 +127,12 @@ pub fn init(mut commands: Commands) {
     let lumberjack = commands
         .spawn((Worker { salary: 600 }, Name::new("Lumberjack")))
         .id();
+    let furniture_maker = commands
+        .spawn((Worker { salary: 1500 }, Name::new("Furniture maker")))
+        .id();
+    let furniture_maker_2 = commands
+        .spawn((Worker { salary: 1200 }, Name::new("Furniture maker")))
+        .id();
     // spawn lumberjack
     commands.spawn(ManufacturerBundle {
         name: Name::new("Lumberjack Hut"),
@@ -250,6 +256,46 @@ pub fn init(mut commands: Commands) {
             },
         ));
     }
+    let mut items = HashMap::new();
+    items.insert(
+        ItemType {
+            name: "boards".to_string(),
+        },
+        10,
+    );
+    commands.spawn((
+        ManufacturerBundle {
+            name: Name::new("Furniture manufacturer"),
+            manufacturer: Manufacturer {
+                production_cycle: ProductionCycle {
+                    input: items,
+                    output: (
+                        ItemType {
+                            name: "furniture".to_string(),
+                        },
+                        1,
+                    ),
+                    // tools: HashMap::new(),
+                    workdays_needed: 2,
+                },
+                assets: Inventory {
+                    items: HashMap::new(),
+                    items_to_sell: HashSet::new(),
+                    money: 100000,
+                },
+                hired_workers: vec![furniture_maker, furniture_maker_2],
+            },
+            sell_strategy: SellStrategy {
+                min_margin: 0.5,
+                margin_drop_per_day: 0.1,
+                current_margin: 2.0,
+            },
+        },
+        BuyStrategy {
+            target_production_cycles: 3,
+            outstanding_orders: 0,
+        },
+    ));
 }
 
 pub fn produce(
