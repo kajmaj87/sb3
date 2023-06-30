@@ -32,13 +32,18 @@ fn main() {
     let git_sha_short = &git_hash[0..7];
 
     // Try to get branch name from GITHUB_HEAD_REF environment variable first, then fallback to git command
-    let git_branch = env::var("GITHUB_HEAD_REF").unwrap_or_else(|_| {
-        let output = Command::new("git")
-            .args(["rev-parse", "--abbrev-ref", "HEAD"])
-            .output()
-            .unwrap();
-        String::from_utf8(output.stdout).unwrap().trim().to_string()
-    });
+    let git_branch = env::var("GITHUB_REF")
+        .map(|ref_string| {
+            let parts: Vec<&str> = ref_string.split('/').collect();
+            parts.last().unwrap_or(&"").to_string()
+        })
+        .unwrap_or_else(|_| {
+            let output = Command::new("git")
+                .args(["rev-parse", "--abbrev-ref", "HEAD"])
+                .output()
+                .unwrap();
+            String::from_utf8(output.stdout).unwrap().trim().to_string()
+        });
 
     let version = env!("CARGO_PKG_VERSION").to_string();
 
