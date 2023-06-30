@@ -1,26 +1,69 @@
 use crate::business::{ItemType, SellOrder};
 use crate::stats::PriceHistory;
-use crate::{Counter, Days};
+use crate::{BuildInfo, Days};
 use bevy::prelude::{Query, Res};
 use bevy_egui::egui::plot::{
     BoxElem, BoxPlot, BoxSpread, Legend, Line, LineStyle, Plot, PlotPoints,
 };
-use bevy_egui::egui::{Color32, Window};
+use bevy_egui::egui::{
+    Align, Color32, Hyperlink, Layout, SidePanel, TopBottomPanel, Widget, Window,
+};
 use bevy_egui::EguiContexts;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, HashMap};
 use std::hash::{Hash, Hasher};
 
-pub fn render_todays_prices(
-    mut egui_context: EguiContexts,
-    sell_orders: Query<&SellOrder>,
-    days: Res<Days>,
-    counter: Res<Counter>,
-) {
-    Window::new("Prices").show(egui_context.ctx_mut(), |ui| {
-        ui.label(format!("Days: {}", days.days));
-        ui.label(format!("Count: {}", counter.0));
+pub fn render_panels(mut egui_context: EguiContexts, days: Res<Days>, build_info: Res<BuildInfo>) {
+    TopBottomPanel::top("top_panel").show(egui_context.ctx_mut(), |ui| {
+        ui.horizontal(|ui| {
+            ui.label(format!("Space Business v{}", build_info.version));
+            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                ui.label(format!("Days: {}", days.days));
+            });
+        });
+    });
 
+    TopBottomPanel::bottom("bottom_panel").show(egui_context.ctx_mut(), |ui| {
+        ui.horizontal(|ui| {
+            ui.label(format!("Build at: {}", build_info.timestamp));
+            ui.separator();
+            ui.horizontal(|ui| {
+                ui.label("Branch: ");
+                let link = Hyperlink::from_label_and_url(
+                    build_info.branch_name.as_str(),
+                    format!(
+                        "https://github.com/kajmaj87/sb3/tree/{}",
+                        build_info.branch_name
+                    ),
+                );
+                link.ui(ui);
+            });
+            ui.separator();
+            ui.horizontal(|ui| {
+                ui.label("Commit: ");
+                let link = Hyperlink::from_label_and_url(
+                    build_info.commit_hash.as_str(),
+                    format!(
+                        "https://github.com/kajmaj87/sb3/commit/{}",
+                        build_info.commit_hash
+                    ),
+                );
+                link.ui(ui);
+            });
+        });
+    });
+    SidePanel::left("left_panel")
+        .resizable(true)
+        .max_width(200.0)
+        .show(egui_context.ctx_mut(), |ui| {
+            ui.label("Left panel");
+        });
+    SidePanel::right("right_panel").show(egui_context.ctx_mut(), |ui| {
+        ui.label("Right panel");
+    });
+}
+pub fn render_todays_prices(mut egui_context: EguiContexts, sell_orders: Query<&SellOrder>) {
+    Window::new("Prices").show(egui_context.ctx_mut(), |ui| {
         let mut grouped_orders = BTreeMap::new();
 
         for sell_order in sell_orders.iter() {
