@@ -9,7 +9,7 @@ LAST_RUN_ID_FILE=$UNPACK_DIR/last_run_id.txt
 
 # Get the last successful run
 RUN_ID=$(curl -s -H "Authorization: token $TOKEN" -H "Accept: application/vnd.github.v3+json" \
-  "https://api.github.com/repos/$REPO/actions/runs?status=completed&event=push" | \
+  "https://api.github.com/repos/$REPO/actions/runs?status=completed" | \
   jq '[.workflow_runs[] | select(.conclusion=="success")][0].id')
 
 echo "Run ID: $RUN_ID"
