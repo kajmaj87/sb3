@@ -38,12 +38,12 @@ if [ $RUN_ID != $LAST_RUN_ID ]; then
   curl -L -o $UNPACK_DIR/artifact.zip -H "Authorization: token $TOKEN" "$ARTIFACT_URL"
 
   # Unzip without asking about overrides into $UNPACK_DIR
-  unzip -o $UNPACK_DIR/artifact.zip -d $UNPACK_DIR
-  chmod +x $UNPACK_DIR/sb3
+  unzip -o $UNPACK_DIR/artifact.zip -d $UNPACK_DIR/$LAST_RUN_ID
+  chmod +x $UNPACK_DIR/$LAST_RUN_ID/sb3
 
   # Save the new run ID
   echo $RUN_ID > $LAST_RUN_ID_FILE
 fi
 
 # Run the binary
-$UNPACK_DIR/sb3
+$UNPACK_DIR/$LAST_RUN_ID/sb3
