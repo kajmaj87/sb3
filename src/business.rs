@@ -39,7 +39,7 @@ pub struct Manufacturer {
     pub(crate) hired_workers: Vec<Entity>,
 }
 
-#[derive(Component, Debug, Deserialize)]
+#[derive(Component, Debug, Deserialize, Copy, Clone)]
 pub struct Worker {
     pub(crate) salary: Money,
     // employer: Entity,
@@ -309,9 +309,9 @@ pub fn update_sell_order_prices(
 
 pub fn create_buy_orders(
     mut commands: Commands,
-    mut manufacturers: Query<(Entity, &Manufacturer, &mut BuyStrategy)>,
+    mut manufacturers: Query<(Entity, &Name, &Manufacturer, &mut BuyStrategy)>,
 ) {
-    for (buyer, manufacturer, mut strategy) in manufacturers.iter_mut() {
+    for (buyer, name, manufacturer, mut strategy) in manufacturers.iter_mut() {
         let needed_materials = &manufacturer.production_cycle.input;
         let inventory = &manufacturer.assets.items;
 
@@ -327,20 +327,24 @@ pub fn create_buy_orders(
                     * quantity_needed
                     - strategy.outstanding_orders;
                 strategy.outstanding_orders += quantity_to_buy;
+                if quantity_to_buy == 0 {
+                    debug!(
+                        "{}: No need to buy any more {}, I already have {} and {} in orders",
+                        name, material.name, inventory_quantity, strategy.outstanding_orders
+                    );
+                    continue;
+                }
+
                 let buy_order = BuyOrder {
                     item_type: material.clone(), // assuming ItemType implements Copy
                     owner: buyer,
                     order: OrderType::Market, // Always buying at market price
                 };
 
-                if quantity_to_buy == 0 {
-                    debug!(
-                        "No need to buy any more {}, I already have {} and {} in orders",
-                        material.name, inventory_quantity, strategy.outstanding_orders
-                    );
-                    continue;
-                }
-                debug!("Created buy order {:?} for {}", buy_order, quantity_to_buy);
+                debug!(
+                    "{}: Created buy order {:?} for {}",
+                    name, buy_order, quantity_to_buy
+                );
 
                 // Assuming we have a way to track the quantity in BuyOrder
                 for _ in 0..quantity_to_buy {
@@ -358,7 +362,7 @@ pub fn execute_orders_for_manufacturers(
     mut commands: Commands,
     mut buy_orders: Query<(Entity, &BuyOrder)>,
     mut sell_orders: Query<(Entity, &SellOrder)>,
-    mut manufacturers: Query<(Entity, &mut Manufacturer)>,
+    mut manufacturers: Query<(Entity, &Name, &mut Manufacturer)>,
     mut buy_strategy: Query<(Entity, &mut BuyStrategy)>,
     mut items: Query<(Entity, &mut Item)>,
 ) {
@@ -439,7 +443,7 @@ pub fn execute_orders_for_manufacturers(
 }
 fn execute_order(
     buy_strategy: &mut Query<(Entity, &mut BuyStrategy)>,
-    manufacturers: &mut Query<(Entity, &mut Manufacturer)>,
+    manufacturers: &mut Query<(Entity, &Name, &mut Manufacturer)>,
     commands: &mut Commands,
     sell_order: (Entity, &SellOrder),
     buy_order: (Entity, &BuyOrder),
@@ -454,11 +458,13 @@ fn execute_order(
     assert_eq!(buy_item_type, sell_item_type);
 
     // Phase 1: Do all the checks and computations
-    let mut buyer_has_enough_money = false;
-    // let mut seller_has_item = false;
-    if let Ok((_, buyer_manufacturer)) = manufacturers.get_mut(buy_order.owner) {
-        if buyer_manufacturer.assets.money >= sell_order.price {
-            buyer_has_enough_money = true;
+    if let Ok((_, name, buyer_manufacturer)) = manufacturers.get_mut(buy_order.owner) {
+        if buyer_manufacturer.assets.money < sell_order.price {
+            debug!(
+                "{}: Cannot execute the order: buyer does not have enough money",
+                name
+            );
+            return;
         }
     }
     // if let Ok((_, mut seller_manufacturer)) = manufacturers.get_mut(sell_order.owner) {
@@ -467,19 +473,8 @@ fn execute_order(
     //     }
     // }
 
-    // If any check failed, abort the operation
-    if !buyer_has_enough_money {
-        debug!("Cannot execute the order: buyer does not have enough money");
-        return;
-    }
-
-    // if !seller_has_item {
-    //     debug!("Cannot execute the order: seller does not have the item");
-    //     return;
-    // }
-
     // Phase 2: Execute the operations
-    if let Ok((_, mut buyer_manufacturer)) = manufacturers.get_mut(buy_order.owner) {
+    if let Ok((_, name, mut buyer_manufacturer)) = manufacturers.get_mut(buy_order.owner) {
         // Transfer money from buyer to seller
         buyer_manufacturer.assets.money -= sell_order.price;
         if let Ok((_, mut strategy)) = buy_strategy.get_mut(buy_order.owner) {
@@ -497,154 +492,22 @@ fn execute_order(
             .or_default()
             .push(sell_order.item);
         commands.entity(buy_order_id).despawn();
+        debug!(
+            "{}: !!!! Executed order: {:?} -> {:?} (buyer got his goods)",
+            name, sell_order, buy_order
+        );
     }
-    if let Ok((_, mut seller_manufacturer)) = manufacturers.get_mut(sell_order.owner) {
+    if let Ok((_, name, mut seller_manufacturer)) = manufacturers.get_mut(sell_order.owner) {
         // Add money to seller
         seller_manufacturer.assets.money += sell_order.price;
+        seller_manufacturer
+            .assets
+            .items_to_sell
+            .remove(&sell_order.item);
         commands.entity(sell_order_id).despawn();
+        debug!(
+            "{}: !!!! Executed order: {:?} -> {:?} (seller got his money)",
+            name, sell_order, buy_order
+        );
     }
-    debug!("!!!! Executed order: {:?} -> {:?}", sell_order, buy_order);
 }
-
-// pub fn create_buy_orders_for_manufacturers(
-//     mut commands: Commands,
-//     mut manufacturers: Query<(Entity, &mut Manufacturer, &BuyStrategy)>,
-//     items_query: Query<&Item>,
-// ) {
-//     for (buyer, mut manufacturer, strategy) in manufacturers.iter_mut() {
-//         let mut items_to_buy = vec![];
-//         for item in manufacturer.assets.items_to_buy.iter() {
-//             items_to_buy.push(*item);
-//         }
-//         for item in items_to_buy {
-//             if let Ok(item_cost) = items_query.get(item) {
-//                 let buy_order = BuyOrder {
-//                     item,
-//                     owner: buyer,
-//                     price: (item_cost.production_cost as f32 * strategy.current_margin) as u64,
-//                     base_price: item_cost.production_cost,
-//                 };
-//                 debug!("Created buy order {:?}", buy_order);
-//                 let strategy_copy = strategy.clone();
-//                 commands.spawn((buy_order, Name::new("Wood buy order"), strategy_copy));
-//                 manufacturer.assets.items_to_buy.remove(&item);
-//             }
-//         }
-//     }
-// }
-
-// fn produce_for_manufacturer(b: &mut Manufacturer, commands: &mut Commands, production_cost: &Query<&ProductionCost>) {
-//     let mut free_workers = b.hired_workers.len() as u32;
-//     let mut variable_cost = 0;
-//     let mut fixed_cost = 0;
-//     let mut cycles = 0;
-//     while b.assets.contains_materials(&b.production_cycle) && free_workers > 0 {
-//         // remove input materials
-//         for (item, amount) in b.production_cycle.input.clone() {
-//             if let Some(a) = b.assets.items.get_mut(&item) {
-//                 if a.len() >= amount as usize {
-//                     for _ in 0..amount {
-//                         if let Some(used_item) = a.pop() {
-//                             production_cost.get(used_item).map(|cost| {
-//                                 variable_cost += cost.variable_cost;
-//                                 fixed_cost += cost.fixed_cost;
-//                             });
-//                             commands.entity(used_item).despawn_recursive();
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//         free_workers -= b.production_cycle.work_days_needed;
-//         cycles += 1;
-//     }
-//     // add output materials
-//     for (item, amount) in b.production_cycle.output.clone() {
-//         // *b.assets.items.entry(item).or_insert(0) += amount * cycles;
-//         let unit_cost =
-//         for _ in 0..amount * cycles {
-//             let new_item = commands.spawn().insert(item.clone()).id();
-//             b.assets.items.entry(item.clone()).or_insert(Vec::new()).push(new_item);
-//         }
-//     }
-// }
-// // mark what tools or machines were used
-// // update assets
-// // calculate production cost
-// #[test]
-// fn test_produce_for_business() {
-//     // all used up
-//     run_produce_for_business_test(1, 12, 1, 2, 2, 0, 24);
-//     // not enough workers
-//     run_produce_for_business_test(1, 12, 1, 2, 1, 1, 12);
-//     // not enough input
-//     run_produce_for_business_test(1, 12, 1, 0, 2, 0, 0);
-// }
-//
-// fn run_produce_for_business_test(
-//     input_item_amount_per_cycle: u32,
-//     output_item_amount_per_cycle: u32,
-//     workers_needed_per_cycle: u32,
-//     input_available: u32,
-//     workers: u32,
-//     expected_remaining_input: u32,
-//     expected_output: u32,
-// ) {
-//     // Define test items
-//     let input_item = ItemType {
-//         name: "Wood".to_string(),
-//     };
-//     let output_item = ItemType {
-//         name: "Furniture".to_string(),
-//     };
-//
-//     // Create a ProductionCycle and Assets for the Business
-//     let production_cycle = ProductionCycle {
-//         input: [(input_item.clone(), input_item_amount_per_cycle)]
-//             .iter()
-//             .cloned()
-//             .collect(),
-//         output: [(output_item.clone(), output_item_amount_per_cycle)]
-//             .iter()
-//             .cloned()
-//             .collect(),
-//         tools: HashMap::new(),
-//         work_days_needed: workers_needed_per_cycle,
-//     };
-//
-//     let assets = Inventory {
-//         resources: [(input_item.clone(), input_available)]
-//             .iter()
-//             .cloned()
-//             .collect(),
-//         tools: HashMap::new(),
-//         products: HashMap::new(),
-//         money: 0,
-//     };
-//
-//     let hired_workers: Vec<Entity> = (1..=workers).map(|i| Entity::from_raw(i)).collect();
-//     // Create a Business
-//     let mut business = Manufacturer {
-//         production_cycle,
-//         assets,
-//         hired_workers: hired_workers.clone(),
-//     };
-//
-//     // Run the produce_for_business function
-//     produce_for_manufacturer(&mut business);
-//
-//     // Check the results
-//     let resources = &business.assets.resources;
-//     let products = &business.assets.products;
-//
-//     assert_eq!(
-//         resources.get(&input_item),
-//         Some(&expected_remaining_input),
-//         "Resource item should have been consumed"
-//     );
-//     assert_eq!(
-//         products.get(&output_item),
-//         Some(&(expected_output)),
-//         "Output product should have been produced"
-//     );
-// }

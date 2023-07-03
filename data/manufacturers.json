@@ -1,0 +1,56 @@
+ [
+   {
+     "name": "Lumberjack",
+     "money": "1M",
+     "workers": [
+       {
+         "salary": 1500
+       }
+     ],
+     "production_cycle": "wood slow",
+     "sell_strategy": {
+       "min_margin": 0.5,
+       "margin_drop_per_day": 0.1,
+       "current_margin": 2.0
+     },
+     "copies": 1
+   },
+   {
+     "name": "Sawmill",
+     "money": "3M",
+     "workers": [
+       {
+         "salary": 1000
+       },
+       {
+         "salary": 1200
+       }
+     ],
+     "production_cycle": "boards",
+     "sell_strategy": {
+       "min_margin": 0.5,
+       "margin_drop_per_day": 0.1,
+       "current_margin": 2.0
+     },
+     "copies": 2
+   },
+   {
+     "name": "Furniture Factory",
+     "money": "3M",
+     "workers": [
+       {
+         "salary": 3000
+       },
+       {
+         "salary": 3000
+       }
+     ],
+     "production_cycle": "furniture",
+     "sell_strategy": {
+       "min_margin": 0.5,
+       "margin_drop_per_day": 0.1,
+       "current_margin": 2.0
+     },
+     "copies": 1
+   }
+ ]

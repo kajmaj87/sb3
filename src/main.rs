@@ -29,7 +29,7 @@ fn main() {
     info!("Build Info: {:?}", info);
     App::new()
         .add_plugins(DefaultPlugins.set(LogPlugin {
-            filter: "info,wgpu_core=warn,wgpu_hal=warn,sb3=info".into(),
+            filter: "info,wgpu_core=warn,wgpu_hal=warn,sb3=debug".into(),
             level: bevy::log::Level::WARN,
         }))
         .add_plugin(EguiPlugin)

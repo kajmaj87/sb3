@@ -140,7 +140,7 @@ impl FromStr for Money {
 #[serde(transparent)]
 pub struct MoneySerde(#[serde(deserialize_with = "money_from_str_or_num")] Money);
 
-fn money_from_str_or_num<'de, D>(deserializer: D) -> Result<Money, D::Error>
+pub fn money_from_str_or_num<'de, D>(deserializer: D) -> Result<Money, D::Error>
 where
     D: serde::Deserializer<'de>,
 {

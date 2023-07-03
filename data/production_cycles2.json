@@ -2,21 +2,27 @@
   {
     "name": "wood fast",
     "input": {},
-    "output": ["wood", 4],
+    "output": {
+      "wood": 4
+    },
     "workdays_needed": 1
   },
   {
     "name": "wood slow",
     "input": {},
-    "output": ["wood", 3],
+    "output": {
+      "wood": 3
+    },
     "workdays_needed": 1
   },
   {
     "name": "boards",
     "input": {
-      "wood": 1
+      "wood": 2
     },
-    "output": ["boards", 10],
+    "output": {
+      "boards": 1
+    },
     "workdays_needed": 1
   },
   {
@@ -24,7 +30,9 @@
     "input": {
       "boards": 10
     },
-    "output": ["furniture", 1],
+    "output": {
+      "furniture": 1
+    },
     "workdays_needed": 2
   }
 ]
