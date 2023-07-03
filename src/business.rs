@@ -1,6 +1,7 @@
 use crate::money::Money;
 use bevy::prelude::*;
 use rand::seq::SliceRandom;
+use serde::Deserialize;
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
@@ -10,17 +11,18 @@ pub struct ItemType {
 }
 
 #[derive(Debug, Clone)]
-struct ProductionCycle {
-    input: HashMap<ItemType, u32>,
-    output: (ItemType, u32),
+pub struct ProductionCycle {
+    pub input: HashMap<ItemType, u32>,
+    pub output: (ItemType, u32),
     // tools: HashMap<ItemType, u32>,
-    workdays_needed: u32,
+    pub workdays_needed: u32,
 }
 
+#[derive(Debug)]
 pub struct Inventory {
-    items: HashMap<ItemType, Vec<Entity>>,
-    items_to_sell: HashSet<Entity>,
-    money: Money,
+    pub(crate) items: HashMap<ItemType, Vec<Entity>>,
+    pub(crate) items_to_sell: HashSet<Entity>,
+    pub(crate) money: Money,
 }
 
 #[derive(Bundle)]
@@ -30,16 +32,16 @@ pub struct ManufacturerBundle {
     pub sell_strategy: SellStrategy,
 }
 
-#[derive(Component)]
+#[derive(Component, Debug)]
 pub struct Manufacturer {
-    production_cycle: ProductionCycle,
-    assets: Inventory,
-    hired_workers: Vec<Entity>,
+    pub(crate) production_cycle: ProductionCycle,
+    pub(crate) assets: Inventory,
+    pub(crate) hired_workers: Vec<Entity>,
 }
 
-#[derive(Component)]
+#[derive(Component, Debug, Deserialize)]
 pub struct Worker {
-    salary: Money,
+    pub(crate) salary: Money,
     // employer: Entity,
 }
 
@@ -86,12 +88,12 @@ impl Ord for SellOrder {
         }
     }
 }
-#[derive(Component, Copy, Clone)]
+#[derive(Component, Copy, Clone, Debug, Deserialize)]
 pub struct SellStrategy {
     // max_margin: f32,
-    margin_drop_per_day: f32,
-    current_margin: f32,
-    min_margin: f32,
+    pub(crate) margin_drop_per_day: f32,
+    pub(crate) current_margin: f32,
+    pub(crate) min_margin: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -109,8 +111,8 @@ pub struct BuyOrder {
 
 #[derive(Component, Copy, Clone)]
 pub struct BuyStrategy {
-    target_production_cycles: u32,
-    outstanding_orders: u32,
+    pub(crate) target_production_cycles: u32,
+    pub(crate) outstanding_orders: u32,
 }
 
 #[derive(Debug)]
@@ -119,199 +121,6 @@ pub enum MaxCycleError {
     // the String will contain the material name
     NotEnoughMaterialsOrWorkers,
     CantPayWorkers,
-}
-
-pub fn init(mut commands: Commands) {
-    let board_maker = commands
-        .spawn((
-            Worker {
-                salary: Money(1000),
-            },
-            Name::new("Board maker"),
-        ))
-        .id();
-    let lumberjack = commands
-        .spawn((Worker { salary: Money(600) }, Name::new("Lumberjack")))
-        .id();
-    let furniture_maker = commands
-        .spawn((
-            Worker {
-                salary: Money(1500),
-            },
-            Name::new("Furniture maker"),
-        ))
-        .id();
-    let furniture_maker_2 = commands
-        .spawn((
-            Worker {
-                salary: Money(1200),
-            },
-            Name::new("Furniture maker"),
-        ))
-        .id();
-    // spawn lumberjack
-    commands.spawn(ManufacturerBundle {
-        name: Name::new("Lumberjack Hut"),
-        manufacturer: Manufacturer {
-            production_cycle: ProductionCycle {
-                input: HashMap::new(),
-                output: (
-                    ItemType {
-                        name: "wood".to_string(),
-                    },
-                    4,
-                ),
-                // tools: HashMap::new(),
-                workdays_needed: 1,
-            },
-            assets: Inventory {
-                items: HashMap::new(),
-                items_to_sell: HashSet::new(),
-                money: Money(20000),
-            },
-            hired_workers: vec![lumberjack],
-        },
-        sell_strategy: SellStrategy {
-            min_margin: 0.5,
-            margin_drop_per_day: 0.1,
-            current_margin: 2.0,
-        },
-    });
-    commands.spawn(ManufacturerBundle {
-        name: Name::new("Lumberjack Hut"),
-        manufacturer: Manufacturer {
-            production_cycle: ProductionCycle {
-                input: HashMap::new(),
-                output: (
-                    ItemType {
-                        name: "wood".to_string(),
-                    },
-                    3,
-                ),
-                // tools: HashMap::new(),
-                workdays_needed: 1,
-            },
-            assets: Inventory {
-                items: HashMap::new(),
-                items_to_sell: HashSet::new(),
-                money: Money(20000),
-            },
-            hired_workers: vec![lumberjack],
-        },
-        sell_strategy: SellStrategy {
-            min_margin: 0.5,
-            margin_drop_per_day: 0.1,
-            current_margin: 2.0,
-        },
-    });
-
-    for _ in 0..10 {
-        // spawn wooden board manufacturer
-        let mut items = HashMap::new();
-        let mut items_in_inventory = vec![];
-        for _ in 0..2 {
-            let item = commands
-                .spawn((
-                    Item {
-                        item_type: ItemType {
-                            name: "wood".to_string(),
-                        },
-                        production_cost: Money(0),
-                        buy_cost: Money(20),
-                        // owner: Entity::new(0),
-                    },
-                    Name::new("Wood"),
-                ))
-                .id();
-            items_in_inventory.push(item);
-        }
-        items.insert(
-            ItemType {
-                name: "wood".to_string(),
-            },
-            items_in_inventory,
-        );
-        let mut input = HashMap::new();
-        input.insert(
-            ItemType {
-                name: "wood".to_string(),
-            },
-            1,
-        );
-        commands.spawn((
-            ManufacturerBundle {
-                name: Name::new("Wooden board manufacturer"),
-                manufacturer: Manufacturer {
-                    production_cycle: ProductionCycle {
-                        input,
-                        output: (
-                            ItemType {
-                                name: "boards".to_string(),
-                            },
-                            10,
-                        ),
-                        // tools: HashMap::new(),
-                        workdays_needed: 1,
-                    },
-                    assets: Inventory {
-                        items,
-                        items_to_sell: HashSet::new(),
-                        money: Money(50000),
-                    },
-                    hired_workers: vec![board_maker],
-                },
-                sell_strategy: SellStrategy {
-                    min_margin: 0.5,
-                    margin_drop_per_day: 0.1,
-                    current_margin: 2.0,
-                },
-            },
-            BuyStrategy {
-                target_production_cycles: 3,
-                outstanding_orders: 0,
-            },
-        ));
-    }
-    let mut items = HashMap::new();
-    items.insert(
-        ItemType {
-            name: "boards".to_string(),
-        },
-        10,
-    );
-    commands.spawn((
-        ManufacturerBundle {
-            name: Name::new("Furniture manufacturer"),
-            manufacturer: Manufacturer {
-                production_cycle: ProductionCycle {
-                    input: items,
-                    output: (
-                        ItemType {
-                            name: "furniture".to_string(),
-                        },
-                        1,
-                    ),
-                    // tools: HashMap::new(),
-                    workdays_needed: 2,
-                },
-                assets: Inventory {
-                    items: HashMap::new(),
-                    items_to_sell: HashSet::new(),
-                    money: Money(100000),
-                },
-                hired_workers: vec![furniture_maker, furniture_maker_2],
-            },
-            sell_strategy: SellStrategy {
-                min_margin: 0.5,
-                margin_drop_per_day: 0.1,
-                current_margin: 2.0,
-            },
-        },
-        BuyStrategy {
-            target_production_cycles: 3,
-            outstanding_orders: 0,
-        },
-    ));
 }
 
 pub fn produce(

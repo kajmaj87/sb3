@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Wood fast",
+    "input": {},
+    "output": ["wood", 4],
+    "workdays_needed": 1
+  },
+  {
+    "name": "Wood slow",
+    "input": {},
+    "output": ["wood", 3],
+    "workdays_needed": 1
+  },
+  {
+    "name": "Boards",
+    "input": {
+      "wood": 2
+    },
+    "output": ["boards", 1],
+    "workdays_needed": 1
+  },
+  {
+    "name": "Furniture",
+    "input": {
+      "boards": 10
+    },
+    "output": ["furniture", 1],
+    "workdays_needed": 2
+  }
+]

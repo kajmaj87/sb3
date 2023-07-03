@@ -1,5 +1,6 @@
 mod business;
 mod config;
+mod init;
 mod money;
 mod people;
 mod stats;
@@ -28,7 +29,7 @@ fn main() {
     info!("Build Info: {:?}", info);
     App::new()
         .add_plugins(DefaultPlugins.set(LogPlugin {
-            filter: "info,wgpu_core=warn,wgpu_hal=warn,sb3=debug".into(),
+            filter: "info,wgpu_core=warn,wgpu_hal=warn,sb3=info".into(),
             level: bevy::log::Level::WARN,
         }))
         .add_plugin(EguiPlugin)
@@ -58,7 +59,7 @@ fn main() {
         .add_system(ui::render_panels)
         .add_system(ui::render_todays_prices)
         .add_system(ui::render_price_history)
-        .add_startup_system(business::init)
+        .add_startup_system(init::init_manufacturers)
         .run();
 }
 

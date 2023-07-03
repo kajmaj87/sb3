@@ -1,9 +1,11 @@
+use serde::de::Error as DeError;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
 use std::str::FromStr;
 
-#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Deserialize, Serialize, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 pub struct Money(pub u64);
 
 impl Add for Money {
@@ -112,7 +114,7 @@ impl Money {
 }
 
 impl FromStr for Money {
-    type Err = ();
+    type Err = Box<dyn std::error::Error>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let s = s.trim_end_matches(" Cr");
@@ -127,9 +129,46 @@ impl FromStr for Money {
         };
 
         let value_str = &s[..s.len() - len_to_trim];
-        match value_str.parse::<f64>() {
-            Ok(value) => Ok(Money((value * multiplier) as u64)),
-            Err(_) => Err(()),
+        value_str
+            .parse::<f64>()
+            .map(|value| Money((value * multiplier) as u64))
+            .map_err(|_| "Invalid format for Money. Expected number or string with suffix.".into())
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct MoneySerde(#[serde(deserialize_with = "money_from_str_or_num")] Money);
+
+fn money_from_str_or_num<'de, D>(deserializer: D) -> Result<Money, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Visitor;
+
+    struct MoneyVisitor;
+
+    impl<'de> Visitor<'de> for MoneyVisitor {
+        type Value = Money;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a string or number")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+        where
+            E: DeError,
+        {
+            Money::from_str(value).map_err(DeError::custom)
+        }
+
+        fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+        where
+            E: DeError,
+        {
+            Ok(Money(value))
         }
     }
+
+    deserializer.deserialize_any(MoneyVisitor)
 }
