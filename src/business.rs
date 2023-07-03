@@ -311,9 +311,18 @@ pub fn create_buy_orders(
     mut commands: Commands,
     mut manufacturers: Query<(Entity, &Name, &Manufacturer, &mut BuyStrategy)>,
 ) {
+    debug!(
+        "Creating buy orders for {} buyers",
+        manufacturers.iter_mut().count()
+    );
     for (buyer, name, manufacturer, mut strategy) in manufacturers.iter_mut() {
         let needed_materials = &manufacturer.production_cycle.input;
         let inventory = &manufacturer.assets.items;
+        debug!(
+            "{}: Needed materials: {:?}",
+            name.as_str(),
+            needed_materials
+        );
 
         for (material, &quantity_needed) in needed_materials.iter() {
             let inventory_quantity = inventory
@@ -321,6 +330,10 @@ pub fn create_buy_orders(
                 .map_or(0, |items| items.len() as u32);
 
             let cycles_possible_with_current_inventory = inventory_quantity / quantity_needed;
+            debug!(
+                "{}: Cycles possible with current inventory: {}",
+                name, cycles_possible_with_current_inventory
+            );
             if cycles_possible_with_current_inventory < strategy.target_production_cycles {
                 let quantity_to_buy = (strategy.target_production_cycles
                     - cycles_possible_with_current_inventory)

@@ -126,7 +126,7 @@ pub fn init_manufacturers(mut commands: Commands) {
     for template in manufacturer_templates {
         let manufacturers = template.to_manufacturer(production_cycles.clone(), &mut commands);
         for manufacturer in manufacturers {
-            if !manufacturer.manufacturer.production_cycle.input.is_empty() {
+            if manufacturer.manufacturer.production_cycle.input.is_empty() {
                 commands.spawn(manufacturer);
             } else {
                 // TODO check if this works even if input is empty and if so create default buy strategy
