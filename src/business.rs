@@ -57,7 +57,7 @@ pub struct Item {
 pub struct SellOrder {
     item: Entity,
     pub(crate) item_type: ItemType,
-    owner: Entity,
+    pub(crate) owner: Entity,
     pub(crate) price: Money,
     pub(crate) base_price: Money,
 }

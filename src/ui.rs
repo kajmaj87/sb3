@@ -1,8 +1,9 @@
-use crate::business::{ItemType, SellOrder};
+use crate::business::{ItemType, Manufacturer, SellOrder};
 use crate::money::Money;
 use crate::stats::PriceHistory;
 use crate::{BuildInfo, Days};
-use bevy::prelude::{Query, Res};
+use bevy::core::Name;
+use bevy::prelude::{Entity, Query, Res};
 use bevy_egui::egui::plot::{
     BoxElem, BoxPlot, BoxSpread, Legend, Line, LineStyle, Plot, PlotPoints,
 };
@@ -10,6 +11,7 @@ use bevy_egui::egui::{
     Align, Color32, Hyperlink, Layout, SidePanel, TopBottomPanel, Widget, Window,
 };
 use bevy_egui::EguiContexts;
+use egui_extras::{Column, TableBuilder};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, HashMap};
 use std::hash::{Hash, Hasher};
@@ -63,6 +65,7 @@ pub fn render_panels(mut egui_context: EguiContexts, days: Res<Days>, build_info
         ui.label("Right panel");
     });
 }
+
 pub fn render_todays_prices(mut egui_context: EguiContexts, sell_orders: Query<&SellOrder>) {
     Window::new("Prices").show(egui_context.ctx_mut(), |ui| {
         let mut grouped_orders = BTreeMap::new();
@@ -183,6 +186,107 @@ pub fn render_price_history(history: Res<PriceHistory>, mut egui_context: EguiCo
                     );
                 }
             });
+    });
+}
+
+pub fn render_manufacturers_stats(
+    mut egui_context: EguiContexts,
+    manufacturers: Query<(Entity, &Name, &Manufacturer)>,
+    sell_orders: Query<&SellOrder>,
+) {
+    Window::new("Manufacturers").show(egui_context.ctx_mut(), |ui| {
+        let mut owner_counts: HashMap<Entity, usize> = HashMap::new();
+
+        for order in sell_orders.iter() {
+            *owner_counts.entry(order.owner).or_insert(0) += 1;
+        }
+        let table = TableBuilder::new(ui)
+            // .striped(self.striped)
+            // .resizable(self.resizable)
+            .cell_layout(Layout::left_to_right(Align::Center))
+            .column(Column::auto())
+            .column(Column::initial(80.0).range(80.0..=200.0))
+            .column(Column::auto())
+            .column(Column::auto())
+            .column(Column::auto())
+            .column(Column::remainder())
+            .min_scrolled_height(0.0);
+
+        table
+            .header(20.0, |mut header| {
+                header.col(|ui| {
+                    ui.strong("Name");
+                });
+                header.col(|ui| {
+                    ui.strong("Money");
+                });
+                header.col(|ui| {
+                    ui.strong("Workers");
+                });
+                header.col(|ui| {
+                    ui.strong("Items");
+                });
+                header.col(|ui| {
+                    ui.strong("Items to sell");
+                });
+                header.col(|ui| {
+                    ui.strong("On Market");
+                });
+            })
+            .body(|mut body| {
+                for (entity, name, manufacturer) in manufacturers.iter() {
+                    body.row(20.0, |mut row| {
+                        row.col(|ui| {
+                            ui.label(name.as_str());
+                        });
+                        row.col(|ui| {
+                            ui.label(manufacturer.assets.money.to_string());
+                        });
+                        row.col(|ui| {
+                            ui.label(manufacturer.hired_workers.len().to_string());
+                        });
+                        row.col(|ui| {
+                            ui.label(
+                                manufacturer
+                                    .assets
+                                    .items
+                                    .values()
+                                    .map(|x| x.len())
+                                    .sum::<usize>()
+                                    .to_string(),
+                            );
+                        });
+                        row.col(|ui| {
+                            ui.label(manufacturer.assets.items_to_sell.len().to_string());
+                        });
+                        row.col(|ui| {
+                            ui.label(owner_counts.get(&entity).unwrap_or(&0).to_string());
+                        });
+                    });
+                }
+            });
+        // for  in 0..NUM_MANUAL_ROWS {
+        //     let is_thick = thick_row(row_index);
+        //     let row_height = if is_thick { 30.0 } else { 18.0 };
+        //     body.row(row_height, |mut row| {
+        //         row.col(|ui| {
+        //             ui.label(row_index.to_string());
+        //         });
+        //         row.col(|ui| {
+        //             expanding_content(ui);
+        //         });
+        //         row.col(|ui| {
+        //             ui.label(long_text(row_index));
+        //         });
+        //         row.col(|ui| {
+        //             ui.style_mut().wrap = Some(false);
+        //             if is_thick {
+        //                 ui.heading("Extra thick row");
+        //             } else {
+        //                 ui.label("Normal row");
+        //             }
+        //         });
+        //     });
     });
 }
 

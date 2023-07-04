@@ -59,6 +59,7 @@ fn main() {
         .add_system(ui::render_panels)
         .add_system(ui::render_todays_prices)
         .add_system(ui::render_price_history)
+        .add_system(ui::render_manufacturers_stats)
         .add_startup_system(init::init_manufacturers)
         .run();
 }
