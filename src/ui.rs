@@ -67,7 +67,9 @@ pub fn render_template_editor(mut egui_context: EguiContexts, mut templates: Res
             if !errors.is_empty() {
                 ui.label("Errors:");
                 ui.vertical(|ui| {
-                    for error in errors.clone() {
+                    let mut sorted_errors = errors.clone();
+                    sorted_errors.sort();
+                    for error in sorted_errors {
                         ui.label(error);
                     }
                 });
@@ -75,7 +77,9 @@ pub fn render_template_editor(mut egui_context: EguiContexts, mut templates: Res
             if !warnings.is_empty() {
                 ui.label("Warnings:");
                 ui.vertical(|ui| {
-                    for warning in warnings {
+                    let mut sorted_warnings = warnings.clone();
+                    sorted_warnings.sort();
+                    for warning in sorted_warnings {
                         ui.label(warning);
                     }
                 });
