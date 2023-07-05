@@ -9,17 +9,19 @@ use bevy_egui::egui::plot::{
     BoxElem, BoxPlot, BoxSpread, Legend, Line, LineStyle, Plot, PlotPoints,
 };
 use bevy_egui::egui::{
-    Align, Color32, Hyperlink, Layout, SidePanel, TopBottomPanel, Widget, Window,
+    Align, Button, Color32, Hyperlink, Layout, SidePanel, TopBottomPanel, Widget, Window,
 };
 use bevy_egui::{egui, EguiContexts};
 use egui_extras::{Column, TableBuilder};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, HashMap};
 use std::hash::{Hash, Hasher};
+use std::process::Command;
 
 pub fn render_template_editor(mut egui_context: EguiContexts, mut templates: ResMut<Templates>) {
     Window::new("Template editor").show(egui_context.ctx_mut(), |ui| {
         egui::ScrollArea::vertical().show(ui, |ui| {
+            let (errors, warnings) = templates.validate();
             ui.radio_value(
                 &mut templates.selected_template,
                 TemplateType::Manufacturers,
@@ -30,32 +32,64 @@ pub fn render_template_editor(mut egui_context: EguiContexts, mut templates: Res
                 TemplateType::ProductionCycles,
                 "Production cycles",
             );
-            let text = match templates.selected_template {
-                TemplateType::Manufacturers => {
-                    let manufacturers = serde_json::from_str::<Vec<ManufacturerTemplate>>(
-                        &templates.manufacturers_json,
-                    );
-                    match manufacturers {
-                        Ok(manufacturers) => templates.manufacturers = manufacturers,
-                        Err(error) => {
-                            ui.label(format!("Invalid JSON: {}", error));
+            let mut json_error= "".to_string();
+            let (text, json_error) = {
+                match templates.selected_template {
+                    TemplateType::Manufacturers => {
+                        let manufacturers = serde_json::from_str::<Vec<ManufacturerTemplate>>(
+                            &templates.manufacturers_json,
+                        );
+                        match manufacturers {
+                            Ok(manufacturers) => templates.manufacturers = manufacturers,
+                            Err(error) => {
+                                json_error = error.to_string();
+                            }
                         }
+                        (&mut templates.manufacturers_json, &mut json_error)
                     }
-                    &mut templates.manufacturers_json
-                }
-                TemplateType::ProductionCycles => {
-                    let production_cycles = serde_json::from_str::<Vec<ProductionCycleTemplate>>(
-                        &templates.production_cycles_json,
-                    );
-                    match production_cycles {
-                        Ok(production_cycles) => templates.production_cycles = production_cycles,
-                        Err(error) => {
-                            ui.label(format!("Invalid JSON: {}", error));
+                    TemplateType::ProductionCycles => {
+                        let production_cycles = serde_json::from_str::<Vec<ProductionCycleTemplate>>(
+                            &templates.production_cycles_json,
+                        );
+                        match production_cycles {
+                            Ok(production_cycles) => templates.production_cycles = production_cycles,
+                            Err(error) => {
+                                json_error = error.to_string();
+                            }
                         }
+                        (&mut templates.production_cycles_json, &mut json_error)
                     }
-                    &mut templates.production_cycles_json
                 }
             };
+            if !json_error.is_empty() {
+                ui.label(format!("JSON error: {}", json_error));
+            }
+            if !errors.is_empty() {
+                ui.label("Errors:");
+                ui.vertical(|ui| {
+                    for error in errors.clone() {
+                        ui.label(error);
+                    }
+                });
+            }
+            if !warnings.is_empty() {
+                ui.label("Warnings:");
+                ui.vertical(|ui| {
+                    for warning in warnings {
+                        ui.label(warning);
+                    }
+                });
+            }
+            if ui.add_enabled(json_error.is_empty() && errors.is_empty(), Button::new("Save & Restart")).clicked() {
+                let _ = templates.save(); // TODO: handle error
+                let args: Vec<String> = std::env::args().collect();
+                Command::new(&args[0])
+                    .args(&args[1..])
+                    .spawn()
+                    .expect("Failed to restart application");
+
+                std::process::exit(0);
+            }
             ui.add(
                 egui::TextEdit::multiline(text)
                     .font(egui::TextStyle::Monospace) // for cursor height

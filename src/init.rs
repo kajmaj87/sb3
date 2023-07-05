@@ -7,8 +7,9 @@ use crate::money::Money;
 use bevy::core::Name;
 use bevy::log::info;
 use bevy::prelude::*;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs::File;
 use std::io::Read;
@@ -20,13 +21,94 @@ pub enum TemplateType {
     ProductionCycles,
 }
 
-#[derive(Resource, Serialize, Deserialize, Debug, Default)]
+#[derive(Resource, Debug, Clone)]
 pub struct Templates {
     pub manufacturers: Vec<ManufacturerTemplate>,
     pub production_cycles: Vec<ProductionCycleTemplate>,
     pub(crate) production_cycles_json: String,
     pub(crate) manufacturers_json: String,
     pub(crate) selected_template: TemplateType,
+    production_cycles_path: String,
+    manufacturers_path: String,
+}
+
+impl Default for Templates {
+    fn default() -> Self {
+        Self {
+            manufacturers: Vec::new(),
+            production_cycles: Vec::new(),
+            production_cycles_json: String::new(),
+            manufacturers_json: String::new(),
+            selected_template: TemplateType::default(),
+            production_cycles_path: "data/production_cycles.json".to_string(),
+            manufacturers_path: "data/manufacturers.json".to_string(),
+        }
+    }
+}
+
+impl Templates {
+    fn load(&mut self) {
+        let (production_json, production_cycles) =
+            Self::load_templates(&self.production_cycles_path)
+                .expect("Unable to load production cycles");
+        let (manufacturers_json, manufacturer_templates) =
+            Self::load_templates(&self.manufacturers_path).expect("Unable to load manufacturers");
+        self.manufacturers = manufacturer_templates;
+        self.production_cycles = production_cycles;
+        self.production_cycles_json = production_json;
+        self.manufacturers_json = manufacturers_json;
+    }
+    pub(crate) fn save(&self) -> Result<(), Box<dyn Error>> {
+        let manufacturers_json = serde_json::to_string_pretty(&self.manufacturers)?;
+        let production_cycles_json = serde_json::to_string_pretty(&self.production_cycles)?;
+
+        std::fs::write(&self.manufacturers_path, manufacturers_json)?;
+        std::fs::write(&self.production_cycles_path, production_cycles_json)?;
+
+        Ok(())
+    }
+
+    pub(crate) fn validate(&self) -> (Vec<String>, Vec<String>) {
+        let mut errors = Vec::new();
+        let mut warnings = Vec::new();
+
+        let production_cycle_names: HashSet<_> = self
+            .production_cycles
+            .iter()
+            .map(|p| p.name.clone())
+            .collect();
+        let mut production_cycle_references: HashSet<String> = HashSet::new();
+
+        for manufacturer in &self.manufacturers {
+            if production_cycle_names.contains(&manufacturer.production_cycle) {
+                production_cycle_references.insert(manufacturer.production_cycle.clone());
+            } else {
+                errors.push(format!(
+                    "Manufacturer {} has invalid production cycle {}",
+                    manufacturer.name, manufacturer.production_cycle
+                ));
+            }
+        }
+
+        for name in production_cycle_names.difference(&production_cycle_references) {
+            warnings.push(format!(
+                "Production cycle {} is not referenced by any manufacturer",
+                name
+            ));
+        }
+
+        (errors, warnings)
+    }
+
+    fn load_templates<T: DeserializeOwned>(
+        file_name: &str,
+    ) -> Result<(String, Vec<T>), Box<dyn Error>> {
+        let mut file = File::open(file_name)?;
+        let mut json_string = String::new();
+        file.read_to_string(&mut json_string)?;
+        let templates: Vec<T> = serde_json::from_str(&json_string)?;
+        Ok((json_string, templates))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -112,41 +194,20 @@ impl ProductionCycleTemplate {
     }
 }
 
-fn load_production_cycles() -> Result<(String, Vec<ProductionCycleTemplate>), Box<dyn Error>> {
-    let mut file = File::open("data/production_cycles.json")?;
-    let mut json_string = String::new();
-    file.read_to_string(&mut json_string)?;
-    let templates: Vec<ProductionCycleTemplate> = serde_json::from_str(&json_string)?;
-    Ok((json_string, templates))
-}
-
-fn load_manufacturers() -> Result<(String, Vec<ManufacturerTemplate>), Box<dyn Error>> {
-    let mut file = File::open("data/manufacturers.json")?;
-    let mut json_string = String::new();
-    file.read_to_string(&mut json_string)?;
-    let templates: Vec<ManufacturerTemplate> = serde_json::from_str(&json_string)?;
-    Ok((json_string, templates))
-}
-
 pub fn init_manufacturers(mut commands: Commands, mut templates: ResMut<Templates>) {
-    let (production_json, production_cycles) =
-        load_production_cycles().expect("Unable to load production cycles");
-    let (manufacturers_json, manufacturer_templates) =
-        load_manufacturers().expect("Unable to load manufacturers");
-    templates.manufacturers = manufacturer_templates.clone();
-    templates.production_cycles = production_cycles.clone();
-    templates.production_cycles_json = production_json;
-    templates.manufacturers_json = manufacturers_json;
-    let production_cycles = production_cycles
+    templates.load();
+    let production_cycles = templates
+        .clone()
+        .production_cycles
         .into_iter()
         .map(|p| p.to_production_cycle())
         .collect::<HashMap<_, _>>();
     info!("Loaded {} production cycles", production_cycles.len());
     info!(
         "Loaded {} manufacturer templates",
-        manufacturer_templates.len()
+        templates.manufacturers.len()
     );
-    for template in manufacturer_templates {
+    for template in templates.clone().manufacturers {
         let manufacturers = template.to_manufacturer(production_cycles.clone(), &mut commands);
         for manufacturer in manufacturers {
             if manufacturer.manufacturer.production_cycle.input.is_empty() {
