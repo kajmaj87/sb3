@@ -1,7 +1,7 @@
 use crate::money::Money;
 use bevy::prelude::*;
 use rand::seq::SliceRandom;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
@@ -39,7 +39,7 @@ pub struct Manufacturer {
     pub(crate) hired_workers: Vec<Entity>,
 }
 
-#[derive(Component, Debug, Deserialize, Copy, Clone)]
+#[derive(Component, Debug, Serialize, Deserialize, Copy, Clone)]
 pub struct Worker {
     pub(crate) salary: Money,
     // employer: Entity,
@@ -88,7 +88,7 @@ impl Ord for SellOrder {
         }
     }
 }
-#[derive(Component, Copy, Clone, Debug, Deserialize)]
+#[derive(Component, Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct SellStrategy {
     // max_margin: f32,
     pub(crate) margin_drop_per_day: f32,

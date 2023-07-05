@@ -9,7 +9,7 @@
      ],
      "production_cycle": "wood slow",
      "sell_strategy": {
-       "min_margin": 0.5,
+       "min_margin": 1.1,
        "margin_drop_per_day": 0.1,
        "current_margin": 2.0
      },
@@ -28,7 +28,7 @@
      ],
      "production_cycle": "boards",
      "sell_strategy": {
-       "min_margin": 0.5,
+       "min_margin": 1.1,
        "margin_drop_per_day": 0.1,
        "current_margin": 2.0
      },
@@ -36,7 +36,7 @@
    },
    {
      "name": "Furniture Factory",
-     "money": "3M",
+     "money": "30000M",
      "workers": [
        {
          "salary": 3000
@@ -47,7 +47,7 @@
      ],
      "production_cycle": "furniture",
      "sell_strategy": {
-       "min_margin": 0.5,
+       "min_margin": 1.1,
        "margin_drop_per_day": 0.1,
        "current_margin": 2.0
      },

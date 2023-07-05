@@ -1,20 +1,73 @@
 use crate::business::{ItemType, Manufacturer, SellOrder};
+use crate::init::{ManufacturerTemplate, ProductionCycleTemplate, TemplateType, Templates};
 use crate::money::Money;
 use crate::stats::PriceHistory;
 use crate::{BuildInfo, Days};
 use bevy::core::Name;
-use bevy::prelude::{Entity, Query, Res};
+use bevy::prelude::{Entity, Query, Res, ResMut};
 use bevy_egui::egui::plot::{
     BoxElem, BoxPlot, BoxSpread, Legend, Line, LineStyle, Plot, PlotPoints,
 };
 use bevy_egui::egui::{
     Align, Color32, Hyperlink, Layout, SidePanel, TopBottomPanel, Widget, Window,
 };
-use bevy_egui::EguiContexts;
+use bevy_egui::{egui, EguiContexts};
 use egui_extras::{Column, TableBuilder};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, HashMap};
 use std::hash::{Hash, Hasher};
+
+pub fn render_template_editor(mut egui_context: EguiContexts, mut templates: ResMut<Templates>) {
+    Window::new("Template editor").show(egui_context.ctx_mut(), |ui| {
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            ui.radio_value(
+                &mut templates.selected_template,
+                TemplateType::Manufacturers,
+                "Manufacturers",
+            );
+            ui.radio_value(
+                &mut templates.selected_template,
+                TemplateType::ProductionCycles,
+                "Production cycles",
+            );
+            let text = match templates.selected_template {
+                TemplateType::Manufacturers => {
+                    let manufacturers = serde_json::from_str::<Vec<ManufacturerTemplate>>(
+                        &templates.manufacturers_json,
+                    );
+                    match manufacturers {
+                        Ok(manufacturers) => templates.manufacturers = manufacturers,
+                        Err(error) => {
+                            ui.label(format!("Invalid JSON: {}", error));
+                        }
+                    }
+                    &mut templates.manufacturers_json
+                }
+                TemplateType::ProductionCycles => {
+                    let production_cycles = serde_json::from_str::<Vec<ProductionCycleTemplate>>(
+                        &templates.production_cycles_json,
+                    );
+                    match production_cycles {
+                        Ok(production_cycles) => templates.production_cycles = production_cycles,
+                        Err(error) => {
+                            ui.label(format!("Invalid JSON: {}", error));
+                        }
+                    }
+                    &mut templates.production_cycles_json
+                }
+            };
+            ui.add(
+                egui::TextEdit::multiline(text)
+                    .font(egui::TextStyle::Monospace) // for cursor height
+                    .code_editor()
+                    .desired_rows(10)
+                    .lock_focus(true)
+                    .desired_width(f32::INFINITY),
+                // .layouter(&mut layouter),
+            );
+        });
+    });
+}
 
 pub fn render_panels(mut egui_context: EguiContexts, days: Res<Days>, build_info: Res<BuildInfo>) {
     TopBottomPanel::top("top_panel").show(egui_context.ctx_mut(), |ui| {

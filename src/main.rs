@@ -41,6 +41,7 @@ fn main() {
         })
         .insert_resource(Counter(0))
         .insert_resource(stats::PriceHistory::default())
+        .insert_resource(init::Templates::default())
         .insert_resource(info)
         .add_system(user_input::input_system.in_base_set(CoreSet::First))
         .add_system(
@@ -60,6 +61,7 @@ fn main() {
         .add_system(ui::render_todays_prices)
         .add_system(ui::render_price_history)
         .add_system(ui::render_manufacturers_stats)
+        .add_system(ui::render_template_editor)
         .add_startup_system(init::init_manufacturers)
         .run();
 }
