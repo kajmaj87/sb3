@@ -1,5 +1,6 @@
 mod business;
 mod config;
+mod debug_ui;
 mod init;
 mod money;
 mod people;
@@ -8,6 +9,7 @@ mod ui;
 mod user_input;
 
 use crate::config::Config;
+use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use bevy_egui::EguiPlugin;
@@ -43,6 +45,9 @@ fn main() {
         .insert_resource(stats::PriceHistory::default())
         .insert_resource(init::Templates::default())
         .insert_resource(info)
+        .insert_resource(debug_ui::Performance::new(100))
+        .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        .add_system(debug_ui::debug_window)
         .add_system(user_input::input_system.in_base_set(CoreSet::First))
         .add_system(
             date_update_system

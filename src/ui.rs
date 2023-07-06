@@ -1,4 +1,5 @@
 use crate::business::{ItemType, Manufacturer, SellOrder};
+use crate::debug_ui::Performance;
 use crate::init::{ManufacturerTemplate, ProductionCycleTemplate, TemplateType, Templates};
 use crate::money::Money;
 use crate::stats::PriceHistory;
@@ -13,11 +14,13 @@ use bevy_egui::egui::{
 };
 use bevy_egui::{egui, EguiContexts};
 use egui_extras::{Column, TableBuilder};
+use macros::measured;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, HashMap};
 use std::hash::{Hash, Hasher};
 use std::process::Command;
 
+#[measured]
 pub fn render_template_editor(mut egui_context: EguiContexts, mut templates: ResMut<Templates>) {
     Window::new("Template editor").show(egui_context.ctx_mut(), |ui| {
         egui::ScrollArea::vertical().show(ui, |ui| {
@@ -107,6 +110,7 @@ pub fn render_template_editor(mut egui_context: EguiContexts, mut templates: Res
     });
 }
 
+#[measured]
 pub fn render_panels(mut egui_context: EguiContexts, days: Res<Days>, build_info: Res<BuildInfo>) {
     TopBottomPanel::top("top_panel").show(egui_context.ctx_mut(), |ui| {
         ui.horizontal(|ui| {
@@ -157,6 +161,7 @@ pub fn render_panels(mut egui_context: EguiContexts, days: Res<Days>, build_info
     });
 }
 
+#[measured]
 pub fn render_todays_prices(mut egui_context: EguiContexts, sell_orders: Query<&SellOrder>) {
     Window::new("Prices").show(egui_context.ctx_mut(), |ui| {
         let mut grouped_orders = BTreeMap::new();
@@ -280,6 +285,7 @@ pub fn render_price_history(history: Res<PriceHistory>, mut egui_context: EguiCo
     });
 }
 
+#[measured]
 pub fn render_manufacturers_stats(
     mut egui_context: EguiContexts,
     manufacturers: Query<(Entity, &Name, &Manufacturer)>,

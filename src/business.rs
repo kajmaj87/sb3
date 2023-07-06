@@ -1,5 +1,7 @@
+use crate::debug_ui::Performance;
 use crate::money::Money;
 use bevy::prelude::*;
+use macros::measured;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -123,6 +125,7 @@ pub enum MaxCycleError {
     CantPayWorkers,
 }
 
+#[measured]
 pub fn produce(
     mut manufacturers: Query<&mut Manufacturer>,
     mut commands: Commands,
@@ -256,6 +259,7 @@ fn calculate_max_cycles(
     Ok((max_cycles, cost_per_cycle))
 }
 
+#[measured]
 pub fn create_sell_orders(
     mut commands: Commands,
     mut manufacturers: Query<(Entity, &mut Manufacturer, &SellStrategy)>,
@@ -289,6 +293,7 @@ pub fn create_sell_orders(
     }
 }
 
+#[measured]
 pub fn update_sell_order_prices(
     mut sell_orders: Query<(Entity, &Name, &mut SellOrder, &mut SellStrategy)>,
 ) {
@@ -307,6 +312,7 @@ pub fn update_sell_order_prices(
     }
 }
 
+#[measured]
 pub fn create_buy_orders(
     mut commands: Commands,
     mut manufacturers: Query<(Entity, &Name, &Manufacturer, &mut BuyStrategy)>,
@@ -371,6 +377,7 @@ pub fn create_buy_orders(
     }
 }
 
+#[measured]
 pub fn execute_orders_for_manufacturers(
     mut commands: Commands,
     mut buy_orders: Query<(Entity, &BuyOrder)>,
