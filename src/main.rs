@@ -1,4 +1,5 @@
 mod business;
+mod commands;
 mod config;
 mod debug_ui;
 mod init;
@@ -46,9 +47,11 @@ fn main() {
         .insert_resource(init::Templates::default())
         .insert_resource(info)
         .insert_resource(debug_ui::Performance::new(100))
+        .add_event::<commands::GameCommand>()
         .add_plugin(FrameTimeDiagnosticsPlugin::default())
         .add_system(debug_ui::debug_window)
         .add_system(user_input::input_system.in_base_set(CoreSet::First))
+        .add_system(commands::command_system)
         .add_system(
             date_update_system
                 .run_if(should_advance_day)
@@ -79,7 +82,7 @@ pub struct Days {
 }
 
 impl Days {
-    fn next_day(&mut self, time: Res<Time>) {
+    fn next_day(&mut self, time: &Res<Time>) {
         self.days += 1;
         self.next_turn = true;
         self.last_update = time.elapsed_seconds();
@@ -90,7 +93,7 @@ impl Days {
 pub struct Counter(usize);
 
 fn date_update_system(mut days: ResMut<Days>, time: Res<Time>) {
-    days.next_day(time);
+    days.next_day(&time);
 }
 
 fn count_system(mut counter: ResMut<Counter>) {
