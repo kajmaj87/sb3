@@ -1,11 +1,12 @@
 use crate::business::{ItemType, Manufacturer, SellOrder};
+use crate::commands::GameCommand;
 use crate::debug_ui::Performance;
 use crate::init::{ManufacturerTemplate, ProductionCycleTemplate, TemplateType, Templates};
 use crate::money::Money;
 use crate::stats::PriceHistory;
 use crate::{BuildInfo, Days};
 use bevy::core::Name;
-use bevy::prelude::{Entity, Query, Res, ResMut};
+use bevy::prelude::{Entity, EventWriter, Query, Res, ResMut};
 use bevy_egui::egui::plot::{
     BoxElem, BoxPlot, BoxSpread, Legend, Line, LineStyle, Plot, PlotPoints,
 };
@@ -111,11 +112,72 @@ pub fn render_template_editor(mut egui_context: EguiContexts, mut templates: Res
 }
 
 #[measured]
-pub fn render_panels(mut egui_context: EguiContexts, days: Res<Days>, build_info: Res<BuildInfo>) {
+pub fn render_panels(
+    mut egui_context: EguiContexts,
+    days: Res<Days>,
+    build_info: Res<BuildInfo>,
+    mut game_commands: EventWriter<GameCommand>,
+) {
     TopBottomPanel::top("top_panel").show(egui_context.ctx_mut(), |ui| {
         ui.horizontal(|ui| {
             ui.label(format!("Space Business v{}", build_info.version));
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                if ui
+                    .button("x32")
+                    .on_hover_text("[key: 6] Set the game speed to x32k days per second")
+                    .clicked()
+                {
+                    game_commands.send(GameCommand::SetSpeed(16.0));
+                }
+                if ui
+                    .button("x16")
+                    .on_hover_text("[key: 5] Set the game speed to x16 days per second")
+                    .clicked()
+                {
+                    game_commands.send(GameCommand::SetSpeed(16.0));
+                }
+                if ui
+                    .button("x8")
+                    .on_hover_text("[key: 4] Set the game speed to x8 days per second")
+                    .clicked()
+                {
+                    game_commands.send(GameCommand::SetSpeed(8.0));
+                }
+                if ui
+                    .button("x4")
+                    .on_hover_text("[key: 3] Set the game speed to x4 days per second")
+                    .clicked()
+                {
+                    game_commands.send(GameCommand::SetSpeed(4.0));
+                }
+                if ui
+                    .button("x2")
+                    .on_hover_text("[key: 2] Set the game speed to x2 days per second")
+                    .clicked()
+                {
+                    game_commands.send(GameCommand::SetSpeed(2.0));
+                }
+                if ui
+                    .button("x1")
+                    .on_hover_text("[key: 1] Set the game speed to x1 day per second")
+                    .clicked()
+                {
+                    game_commands.send(GameCommand::SetSpeed(1.0));
+                }
+                if ui
+                    .button("N")
+                    .on_hover_text("[key: ENTER] Advance to next day")
+                    .clicked()
+                {
+                    game_commands.send(GameCommand::AdvanceDay);
+                }
+                if ui
+                    .button("P")
+                    .on_hover_text("[key: `] Pause the game")
+                    .clicked()
+                {
+                    game_commands.send(GameCommand::SetSpeed(0.0));
+                }
                 ui.label(format!("Days: {}", days.days));
             });
         });

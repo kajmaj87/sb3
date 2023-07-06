@@ -21,7 +21,9 @@ pub fn command_system(
                 config.game.speed.value = BASE_SECONDS_PER_DAY / value;
             }
             GameCommand::AdvanceDay => {
-                if config.game.speed.value == 0.0 {
+                if config.game.speed.value != 0.0 {
+                    config.game.speed.value = 0.0;
+                } else {
                     days.next_day(&time);
                 }
             }
