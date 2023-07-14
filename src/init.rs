@@ -176,7 +176,7 @@ impl ManufacturerTemplate {
             let workers = self
                 .workers
                 .iter()
-                .map(|w| commands.spawn(*w).id())
+                .map(|w| commands.spawn((*w, Wallet { money: Money(0) })).id())
                 .collect::<Vec<_>>();
             let manufacturer = ManufacturerBundle {
                 name: Name::new(self.name.clone()),

@@ -32,7 +32,7 @@ fn main() {
     info!("Build Info: {:?}", info);
     App::new()
         .add_plugins(DefaultPlugins.set(LogPlugin {
-            filter: "info,wgpu_core=warn,wgpu_hal=warn,sb3=debug".into(),
+            filter: "info,wgpu_core=warn,wgpu_hal=warn,sb3=info".into(),
             level: bevy::log::Level::WARN,
         }))
         .add_plugin(EguiPlugin)
@@ -48,7 +48,7 @@ fn main() {
         .insert_resource(info)
         .insert_resource(debug_ui::Performance::new(100))
         .add_event::<commands::GameCommand>()
-        .add_plugin(FrameTimeDiagnosticsPlugin::default())
+        .add_plugin(FrameTimeDiagnosticsPlugin)
         .add_system(debug_ui::debug_window)
         .add_system(user_input::input_system.in_base_set(CoreSet::First))
         .add_system(commands::command_system)

@@ -181,11 +181,11 @@ fn execute_production_cycle(
             }
             debug!("Total cost per cycle: {}", cost_per_cycle);
 
-            if wallet.money < cost_per_cycle {
-                debug!("Not enough money to run a cycle, nothing will be produced");
-                return;
-            }
-            wallet.money -= cost_per_cycle;
+            // if wallet.money < cost_per_cycle {
+            //     debug!("Not enough money to run a cycle, nothing will be produced");
+            //     return;
+            // }
+            // wallet.money -= cost_per_cycle;
 
             // Calculate output materials and their unit costs
             let (output_material, quantity_produced) =
