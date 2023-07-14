@@ -1,42 +1,239 @@
 [
   {
-    "name": "wood fast",
+    "name": "Ore Mining",
     "input": {},
     "output": [
-      "wood",
+      "raw ore",
+      1
+    ],
+    "workdays_needed": 2
+  },
+  {
+    "name": "Solar Energy Collection",
+    "input": {},
+    "output": [
+      "energy",
+      20
+    ],
+    "workdays_needed": 1
+  },
+  {
+    "name": "Gas Harvesting",
+    "input": {},
+    "output": [
+      "exotic gas",
+      1
+    ],
+    "workdays_needed": 2
+  },
+  {
+    "name": "Hydroponic Food Production",
+    "input": {},
+    "output": [
+      "raw food",
+      10
+    ],
+    "workdays_needed": 1
+  },
+  {
+    "name": "Synthetic Fabric Production",
+    "input": {},
+    "output": [
+      "synthetic fabric",
       4
     ],
     "workdays_needed": 1
   },
   {
-    "name": "wood slow",
-    "input": {},
+    "name": "Ore Refinement",
+    "input": {
+      "raw ore": 1,
+      "energy": 2
+    },
     "output": [
-      "wood",
-      3
+      "refined metal",
+      1
     ],
     "workdays_needed": 1
   },
   {
-    "name": "boards",
+    "name": "Exotic Gas Compression",
     "input": {
-      "wood": 1
+      "exotic gas": 1,
+      "energy": 2
     },
     "output": [
-      "boards",
-      100
+      "compressed exotic gas",
+      1
     ],
     "workdays_needed": 1
   },
   {
-    "name": "furniture",
+    "name": "Food Processing",
     "input": {
-      "boards": 10
+      "raw food": 5,
+      "energy": 1
     },
     "output": [
-      "furniture",
+      "processed food",
+      4
+    ],
+    "workdays_needed": 1
+  },
+  {
+    "name": "Fabric Weaving",
+    "input": {
+      "synthetic fabric": 2,
+      "energy": 1
+    },
+    "output": [
+      "woven fabric",
+      1
+    ],
+    "workdays_needed": 1
+  },
+  {
+    "name": "Processor Fabrication",
+    "input": {
+      "refined metal": 1,
+      "energy": 2
+    },
+    "output": [
+      "processor",
       1
     ],
     "workdays_needed": 2
+  },
+  {
+    "name": "Quantum Battery Production",
+    "input": {
+      "refined metal": 1,
+      "compressed exotic gas": 1,
+      "energy": 2
+    },
+    "output": [
+      "quantum battery",
+      1
+    ],
+    "workdays_needed": 2
+  },
+  {
+    "name": "HoloScreen Fabrication",
+    "input": {
+      "processor": 1,
+      "energy": 1
+    },
+    "output": [
+      "holoScreen",
+      1
+    ],
+    "workdays_needed": 1
+  },
+  {
+    "name": "FutureWear Clothing Production",
+    "input": {
+      "woven fabric": 1,
+      "energy": 1
+    },
+    "output": [
+      "FutureWear",
+      1
+    ],
+    "workdays_needed": 1
+  },
+  {
+    "name": "Spaceship Construction",
+    "input": {
+      "refined metal": 10,
+      "processor": 3,
+      "quantum battery": 2,
+      "energy": 20
+    },
+    "output": [
+      "spaceship",
+      1
+    ],
+    "workdays_needed": 7
+  },
+  {
+    "name": "Space Station Assembly",
+    "input": {
+      "refined metal": 50,
+      "processor": 5,
+      "quantum battery": 4,
+      "energy": 30
+    },
+    "output": [
+      "space station",
+      1
+    ],
+    "workdays_needed": 14
+  },
+  {
+    "name": "SmartAppliances Production",
+    "input": {
+      "processor": 2,
+      "holoScreen": 1,
+      "refined metal": 2,
+      "energy": 5
+    },
+    "output": [
+      "SmartAppliance",
+      1
+    ],
+    "workdays_needed": 3
+  },
+  {
+    "name": "Hydroponic HomeKit Production",
+    "input": {
+      "refined metal": 2,
+      "processor": 1,
+      "energy": 2
+    },
+    "output": [
+      "Hydroponic HomeKit",
+      1
+    ],
+    "workdays_needed": 3
+  },
+  {
+    "name": "Interstellar Portal Construction",
+    "input": {
+      "spaceship": 1,
+      "space station": 1,
+      "energy": 50
+    },
+    "output": [
+      "interstellar portal",
+      1
+    ],
+    "workdays_needed": 30
+  },
+  {
+    "name": "SmartHome Installation",
+    "input": {
+      "SmartAppliance": 2,
+      "Hydroponic HomeKit": 1,
+      "energy": 5
+    },
+    "output": [
+      "SmartHome installation",
+      1
+    ],
+    "workdays_needed": 5
+  },
+  {
+    "name": "Luxury Space Cruise Ticket",
+    "input": {
+      "spaceship": 1,
+      "processed food": 20,
+      "FutureWear": 2,
+      "energy": 5
+    },
+    "output": [
+      "Luxury Space Cruise Ticket",
+      1
+    ],
+    "workdays_needed": 3
   }
 ]

@@ -71,7 +71,11 @@ impl Templates {
     pub(crate) fn validate(&self) -> (Vec<String>, Vec<String>) {
         let mut errors = Vec::new();
         let mut warnings = Vec::new();
-
+        let production_cycle_workdays: HashMap<_, _> = self
+            .production_cycles
+            .iter()
+            .map(|p| (p.name.clone(), p.workdays_needed))
+            .collect();
         let production_cycle_names: HashSet<_> = self
             .production_cycles
             .iter()
@@ -82,6 +86,18 @@ impl Templates {
         for manufacturer in &self.manufacturers {
             if production_cycle_names.contains(&manufacturer.production_cycle) {
                 production_cycle_references.insert(manufacturer.production_cycle.clone());
+                // Get the workdays_needed for this manufacturer's production cycle
+                let cycle_workdays = production_cycle_workdays
+                    .get(&manufacturer.production_cycle)
+                    .expect("Production cycle not found"); // This shouldn't fail since we've already checked that the cycle exists
+
+                // Compare the workdays_needed to the manufacturer's number of workers
+                if *cycle_workdays > manufacturer.workers.len() as u32 {
+                    warnings.push(format!(
+                        "Manufacturer {} has fewer workers ({}) than workdays needed ({}) for production cycle {}",
+                        manufacturer.name, manufacturer.workers.len(), cycle_workdays, manufacturer.production_cycle
+                    ));
+                }
             } else {
                 errors.push(format!(
                     "Manufacturer {} has invalid production cycle {}",
@@ -97,7 +113,34 @@ impl Templates {
             ));
         }
 
+        warnings.append(&mut self.validate_input_materials());
+
         (errors, warnings)
+    }
+
+    fn validate_input_materials(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+
+        // Create a set of all materials that are produced
+        let produced_materials: HashSet<_> = self
+            .production_cycles
+            .iter()
+            .map(|p| p.output.0.clone())
+            .collect();
+
+        // Check each production cycle's inputs against the set of produced materials
+        for production_cycle in &self.production_cycles {
+            for input_material in production_cycle.input.keys() {
+                if !produced_materials.contains(input_material) {
+                    warnings.push(format!(
+                        "Input material {} in production cycle {} cannot be created",
+                        input_material, production_cycle.name
+                    ));
+                }
+            }
+        }
+
+        warnings
     }
 
     fn load_templates<T: DeserializeOwned>(
@@ -222,7 +265,7 @@ pub fn init_manufacturers(mut commands: Commands, mut templates: ResMut<Template
                     manufacturer,
                     BuyStrategy {
                         target_production_cycles: 2,
-                        outstanding_orders: 0,
+                        outstanding_orders: HashMap::new(),
                     },
                 ));
             }

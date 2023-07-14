@@ -1,13 +1,16 @@
 [
   {
-    "name": "Lumberjack",
+    "name": "Ore Mine",
     "money": 1000000,
     "workers": [
       {
         "salary": 1500
+      },
+      {
+        "salary": 1500
       }
     ],
-    "production_cycle": "wood slow",
+    "production_cycle": "Ore Mining",
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
@@ -16,8 +19,8 @@
     "copies": 1
   },
   {
-    "name": "Sawmill",
-    "money": 3000000,
+    "name": "Solar Power Plant",
+    "money": 2000000,
     "workers": [
       {
         "salary": 1000
@@ -26,26 +29,386 @@
         "salary": 1200
       }
     ],
-    "production_cycle": "boards",
+    "production_cycle": "Solar Energy Collection",
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
       "min_margin": 1.1
     },
-    "copies": 2
+    "copies": 1
   },
   {
-    "name": "Furniture Factory",
-    "money": 30000000000,
+    "name": "Gas Harvesting Facility",
+    "money": 2500000,
+    "workers": [
+      {
+        "salary": 1300
+      },
+      {
+        "salary": 1300
+      }
+    ],
+    "production_cycle": "Gas Harvesting",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "Hydroponics Farm",
+    "money": 1500000,
+    "workers": [
+      {
+        "salary": 800
+      }
+    ],
+    "production_cycle": "Hydroponic Food Production",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "Synthetic Fabric Factory",
+    "money": 5000000,
+    "workers": [
+      {
+        "salary": 1700
+      }
+    ],
+    "production_cycle": "Synthetic Fabric Production",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "Ore Refinement Plant",
+    "money": 3000000,
+    "workers": [
+      {
+        "salary": 1200
+      },
+      {
+        "salary": 1300
+      }
+    ],
+    "production_cycle": "Ore Refinement",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "Gas Compression Station",
+    "money": 3500000,
+    "workers": [
+      {
+        "salary": 1500
+      }
+    ],
+    "production_cycle": "Exotic Gas Compression",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "Food Processing Plant",
+    "money": 2000000,
+    "workers": [
+      {
+        "salary": 1000
+      },
+      {
+        "salary": 1100
+      }
+    ],
+    "production_cycle": "Food Processing",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "Fabric Weaving Workshop",
+    "money": 2000000,
+    "workers": [
+      {
+        "salary": 1100
+      }
+    ],
+    "production_cycle": "Fabric Weaving",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "Processor Fabrication Plant",
+    "money": 4000000,
+    "workers": [
+      {
+        "salary": 1600
+      },
+      {
+        "salary": 1600
+      }
+    ],
+    "production_cycle": "Processor Fabrication",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "FutureWear Clothing",
+    "money": 2000000,
+    "workers": [
+      {
+        "salary": 1200
+      },
+      {
+        "salary": 1300
+      }
+    ],
+    "production_cycle": "FutureWear Clothing Production",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "Quantum Battery Factory",
+    "money": 5000000,
+    "workers": [
+      {
+        "salary": 2000
+      },
+      {
+        "salary": 2000
+      }
+    ],
+    "production_cycle": "Quantum Battery Production",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "HoloScreen Manufacturer",
+    "money": 4000000,
+    "workers": [
+      {
+        "salary": 1800
+      },
+      {
+        "salary": 1800
+      }
+    ],
+    "production_cycle": "HoloScreen Fabrication",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "FutureWear Clothing Factory",
+    "money": 3000000,
+    "workers": [
+      {
+        "salary": 1500
+      },
+      {
+        "salary": 1500
+      }
+    ],
+    "production_cycle": "FutureWear Clothing Production",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "Spaceship Construction Yard",
+    "money": 50000000,
+    "workers": [
+      {
+        "salary": 5000
+      },
+      {
+        "salary": 5000
+      },
+      {
+        "salary": 1500
+      },
+      {
+        "salary": 1500
+      },
+      {
+        "salary": 1500
+      },
+      {
+        "salary": 1500
+      },
+      {
+        "salary": 1500
+      }
+    ],
+    "production_cycle": "Spaceship Construction",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "Space Station Assembler",
+    "money": 100000000,
+    "workers": [
+      {
+        "salary": 6000
+      },
+      {
+        "salary": 6000
+      }
+    ],
+    "production_cycle": "Space Station Assembly",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "SmartAppliances Factory",
+    "money": 4000000,
+    "workers": [
+      {
+        "salary": 2000
+      },
+      {
+        "salary": 2000
+      },
+      {
+        "salary": 1500
+      }
+    ],
+    "production_cycle": "SmartAppliances Production",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "Hydroponic HomeKit Producer",
+    "money": 3000000,
+    "workers": [
+      {
+        "salary": 1500
+      },
+      {
+        "salary": 1500
+      },
+      {
+        "salary": 1500
+      }
+    ],
+    "production_cycle": "Hydroponic HomeKit Production",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "Interstellar Portal Constructor",
+    "money": 1000000000,
+    "workers": [
+      {
+        "salary": 10000
+      }
+    ],
+    "production_cycle": "Interstellar Portal Construction",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "SmartHome Installation Service",
+    "money": 3000000,
+    "workers": [
+      {
+        "salary": 2000
+      },
+      {
+        "salary": 1500
+      },
+      {
+        "salary": 1500
+      },
+      {
+        "salary": 1500
+      },
+      {
+        "salary": 1500
+      }
+    ],
+    "production_cycle": "SmartHome Installation",
+    "sell_strategy": {
+      "margin_drop_per_day": 0.1,
+      "current_margin": 2.0,
+      "min_margin": 1.1
+    },
+    "copies": 1
+  },
+  {
+    "name": "Luxury Space Cruise Provider",
+    "money": 50000000,
     "workers": [
       {
         "salary": 3000
       },
       {
         "salary": 3000
+      },
+      {
+        "salary": 1500
       }
     ],
-    "production_cycle": "furniture",
+    "production_cycle": "Luxury Space Cruise Ticket",
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,

@@ -63,6 +63,7 @@ pub struct SellOrder {
     pub(crate) price: Money,
     pub(crate) base_price: Money,
 }
+
 impl PartialEq for SellOrder {
     fn eq(&self, other: &Self) -> bool {
         self.item_type == other.item_type && self.price == other.price
@@ -90,6 +91,7 @@ impl Ord for SellOrder {
         }
     }
 }
+
 #[derive(Component, Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct SellStrategy {
     // max_margin: f32,
@@ -111,10 +113,10 @@ pub struct BuyOrder {
     order: OrderType,
 }
 
-#[derive(Component, Copy, Clone)]
+#[derive(Component, Clone)]
 pub struct BuyStrategy {
     pub(crate) target_production_cycles: u32,
-    pub(crate) outstanding_orders: u32,
+    pub(crate) outstanding_orders: HashMap<ItemType, u32>,
 }
 
 #[derive(Debug)]
@@ -341,15 +343,29 @@ pub fn create_buy_orders(
                 name, cycles_possible_with_current_inventory
             );
             if cycles_possible_with_current_inventory < strategy.target_production_cycles {
+                let current_orders = *strategy.outstanding_orders.get(material).unwrap_or(&0);
+                debug!(
+                    "{}: I need to buy {} for {} more production cycles. I already have {} and {:?} in orders",
+                    name,
+                    material.name,
+                    strategy.target_production_cycles - cycles_possible_with_current_inventory,
+                    inventory_quantity,
+                    strategy.outstanding_orders
+                );
                 let quantity_to_buy = (strategy.target_production_cycles
                     - cycles_possible_with_current_inventory)
                     * quantity_needed
-                    - strategy.outstanding_orders;
-                strategy.outstanding_orders += quantity_to_buy;
+                    - current_orders;
+                strategy
+                    .outstanding_orders
+                    .insert(material.clone(), current_orders + quantity_to_buy);
                 if quantity_to_buy == 0 {
                     debug!(
                         "{}: No need to buy any more {}, I already have {} and {} in orders",
-                        name, material.name, inventory_quantity, strategy.outstanding_orders
+                        name,
+                        material.name,
+                        inventory_quantity,
+                        strategy.outstanding_orders.get(material).unwrap_or(&0)
                     );
                     continue;
                 }
@@ -461,6 +477,7 @@ pub fn execute_orders_for_manufacturers(
         }
     }
 }
+
 fn execute_order(
     buy_strategy: &mut Query<(Entity, &mut BuyStrategy)>,
     manufacturers: &mut Query<(Entity, &Name, &mut Manufacturer)>,
@@ -498,7 +515,10 @@ fn execute_order(
         // Transfer money from buyer to seller
         buyer_manufacturer.assets.money -= sell_order.price;
         if let Ok((_, mut strategy)) = buy_strategy.get_mut(buy_order.owner) {
-            strategy.outstanding_orders -= 1;
+            *strategy
+                .outstanding_orders
+                .get_mut(&buy_order.item_type)
+                .unwrap() -= 1;
         }
 
         // Transfer item from seller to buyer
