@@ -1,6 +1,6 @@
 use crate::business::{
     BuyStrategy, Inventory, ItemType, Manufacturer, ManufacturerBundle, ProductionCycle,
-    SellStrategy, Worker,
+    SellStrategy, Wallet, Worker,
 };
 use crate::money::money_from_str_or_num;
 use crate::money::Money;
@@ -185,11 +185,13 @@ impl ManufacturerTemplate {
                         .cloned()
                         .unwrap_or_else(|| panic!("{} not found, make sure production cycle with this name is defined in production_cycles.json", self.production_cycle)),
                     assets: Inventory {
-                        money: self.money,
                         items: HashMap::new(),
                         items_to_sell: Default::default(),
                     },
                     hired_workers: workers,
+                },
+                wallet: Wallet {
+                    money: self.money,
                 },
                 sell_strategy: self.sell_strategy,
             };

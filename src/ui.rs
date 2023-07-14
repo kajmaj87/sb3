@@ -1,4 +1,4 @@
-use crate::business::{ItemType, Manufacturer, SellOrder};
+use crate::business::{ItemType, Manufacturer, SellOrder, Wallet};
 use crate::commands::GameCommand;
 use crate::debug_ui::Performance;
 use crate::init::{ManufacturerTemplate, ProductionCycleTemplate, TemplateType, Templates};
@@ -350,7 +350,7 @@ pub fn render_price_history(history: Res<PriceHistory>, mut egui_context: EguiCo
 #[measured]
 pub fn render_manufacturers_stats(
     mut egui_context: EguiContexts,
-    manufacturers: Query<(Entity, &Name, &Manufacturer)>,
+    manufacturers: Query<(Entity, &Name, &Wallet, &Manufacturer)>,
     sell_orders: Query<&SellOrder>,
 ) {
     Window::new("Manufacturers").show(egui_context.ctx_mut(), |ui| {
@@ -393,13 +393,13 @@ pub fn render_manufacturers_stats(
                 });
             })
             .body(|mut body| {
-                for (entity, name, manufacturer) in manufacturers.iter() {
+                for (entity, name, wallet, manufacturer) in manufacturers.iter() {
                     body.row(20.0, |mut row| {
                         row.col(|ui| {
                             ui.label(name.as_str());
                         });
                         row.col(|ui| {
-                            ui.label(manufacturer.assets.money.to_string());
+                            ui.label(wallet.money.to_string());
                         });
                         row.col(|ui| {
                             ui.label(manufacturer.hired_workers.len().to_string());

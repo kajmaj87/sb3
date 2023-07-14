@@ -1,3 +1,5 @@
+use crate::business::Wallet;
+use crate::money::Money;
 use bevy::diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin};
 use bevy::prelude::*;
 use bevy_egui::egui::Window;
@@ -93,11 +95,18 @@ pub fn debug_window(
     mut egui_context: EguiContexts,
     diagnostics: Res<Diagnostics>,
     performance: Res<Performance>,
+    wallets: Query<&Wallet>,
+    entities: Query<Entity>,
 ) {
     if let Some(fps) = diagnostics.get(FrameTimeDiagnosticsPlugin::FPS) {
         if let Some(average) = fps.average() {
             Window::new("Debug").show(egui_context.ctx_mut(), |ui| {
                 ui.label(format!("Rendering @{:.1}fps", average));
+                ui.label(format!("Entities: {}", entities.iter().count()));
+                ui.label(format!(
+                    "Total Money: {}",
+                    wallets.iter().fold(Money(0), |acc, w| acc + w.money)
+                ));
                 ui.collapsing("Performance Stats", |ui| {
                     TableBuilder::new(ui)
                         .striped(true)

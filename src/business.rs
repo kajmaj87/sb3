@@ -24,6 +24,10 @@ pub struct ProductionCycle {
 pub struct Inventory {
     pub(crate) items: HashMap<ItemType, Vec<Entity>>,
     pub(crate) items_to_sell: HashSet<Entity>,
+}
+
+#[derive(Component)]
+pub struct Wallet {
     pub(crate) money: Money,
 }
 
@@ -32,6 +36,7 @@ pub struct ManufacturerBundle {
     pub name: Name,
     pub manufacturer: Manufacturer,
     pub sell_strategy: SellStrategy,
+    pub wallet: Wallet,
 }
 
 #[derive(Component, Debug)]
@@ -129,17 +134,18 @@ pub enum MaxCycleError {
 
 #[measured]
 pub fn produce(
-    mut manufacturers: Query<&mut Manufacturer>,
+    mut manufacturers: Query<(&mut Wallet, &mut Manufacturer)>,
     mut commands: Commands,
     workers_query: Query<&Worker>,
     items_query: Query<&Item>,
 ) {
-    for mut manufacturer in manufacturers.iter_mut() {
+    for (mut wallet, mut manufacturer) in manufacturers.iter_mut() {
         // fill production cycle
         // produce_for_manufacturer(&mut b, commands, &production_cost);
         execute_production_cycle(
             &mut commands,
             &mut manufacturer,
+            &mut wallet,
             &workers_query,
             &items_query,
         )
@@ -148,13 +154,15 @@ pub fn produce(
 
 fn execute_production_cycle(
     commands: &mut Commands,
-    manufacturer: &mut Manufacturer,
+    manufacturer: &mut Mut<Manufacturer>,
+    wallet: &mut Mut<Wallet>,
     workers_query: &Query<&Worker>,
     items_query: &Query<&Item>,
 ) {
-    match calculate_max_cycles(manufacturer, workers_query) {
+    match calculate_max_cycles(wallet, manufacturer, workers_query) {
         Ok((max_cycles, mut cost_per_cycle)) => {
-            for (input_material, &quantity_needed) in manufacturer.production_cycle.input.iter() {
+            let input = manufacturer.production_cycle.input.clone();
+            for (input_material, quantity_needed) in input.iter() {
                 for _ in 0..quantity_needed * max_cycles {
                     let item = manufacturer
                         .assets
@@ -173,14 +181,15 @@ fn execute_production_cycle(
             }
             debug!("Total cost per cycle: {}", cost_per_cycle);
 
-            if manufacturer.assets.money < cost_per_cycle {
+            if wallet.money < cost_per_cycle {
                 debug!("Not enough money to run a cycle, nothing will be produced");
                 return;
             }
-            manufacturer.assets.money -= cost_per_cycle;
+            wallet.money -= cost_per_cycle;
 
             // Calculate output materials and their unit costs
-            let (output_material, quantity_produced) = &manufacturer.production_cycle.output;
+            let (output_material, quantity_produced) =
+                &manufacturer.production_cycle.output.clone();
             let unit_cost = cost_per_cycle / (*quantity_produced * max_cycles) as u64;
             for _ in 0..*quantity_produced * max_cycles {
                 let item = Item {
@@ -215,7 +224,8 @@ fn execute_production_cycle(
 }
 
 fn calculate_max_cycles(
-    manufacturer: &Manufacturer,
+    wallet: &Mut<Wallet>,
+    manufacturer: &Mut<Manufacturer>,
     workers_query: &Query<&Worker>,
 ) -> Result<(u32, Money), MaxCycleError> {
     let mut max_cycles = u32::MAX;
@@ -253,7 +263,7 @@ fn calculate_max_cycles(
     }
     debug!("Salaries cost per cycle: {}", cost_per_cycle);
 
-    if manufacturer.assets.money < cost_per_cycle {
+    if wallet.money < cost_per_cycle {
         debug!("Dear Lord, we can't even pay our workers, we're doomed!");
         return Err(MaxCycleError::CantPayWorkers);
     }
@@ -398,7 +408,7 @@ pub fn execute_orders_for_manufacturers(
     mut commands: Commands,
     mut buy_orders: Query<(Entity, &BuyOrder)>,
     mut sell_orders: Query<(Entity, &SellOrder)>,
-    mut manufacturers: Query<(Entity, &Name, &mut Manufacturer)>,
+    mut manufacturers: Query<(Entity, &Name, &mut Wallet, &mut Manufacturer)>,
     mut buy_strategy: Query<(Entity, &mut BuyStrategy)>,
     mut items: Query<(Entity, &mut Item)>,
 ) {
@@ -480,7 +490,7 @@ pub fn execute_orders_for_manufacturers(
 
 fn execute_order(
     buy_strategy: &mut Query<(Entity, &mut BuyStrategy)>,
-    manufacturers: &mut Query<(Entity, &Name, &mut Manufacturer)>,
+    manufacturers: &mut Query<(Entity, &Name, &mut Wallet, &mut Manufacturer)>,
     commands: &mut Commands,
     sell_order: (Entity, &SellOrder),
     buy_order: (Entity, &BuyOrder),
@@ -495,8 +505,8 @@ fn execute_order(
     assert_eq!(buy_item_type, sell_item_type);
 
     // Phase 1: Do all the checks and computations
-    if let Ok((_, name, buyer_manufacturer)) = manufacturers.get_mut(buy_order.owner) {
-        if buyer_manufacturer.assets.money < sell_order.price {
+    if let Ok((_, name, wallet, _)) = manufacturers.get_mut(buy_order.owner) {
+        if wallet.money < sell_order.price {
             debug!(
                 "{}: Cannot execute the order: buyer does not have enough money",
                 name
@@ -511,9 +521,11 @@ fn execute_order(
     // }
 
     // Phase 2: Execute the operations
-    if let Ok((_, name, mut buyer_manufacturer)) = manufacturers.get_mut(buy_order.owner) {
+    if let Ok((_, name, mut wallet, mut buyer_manufacturer)) =
+        manufacturers.get_mut(buy_order.owner)
+    {
         // Transfer money from buyer to seller
-        buyer_manufacturer.assets.money -= sell_order.price;
+        wallet.money -= sell_order.price;
         if let Ok((_, mut strategy)) = buy_strategy.get_mut(buy_order.owner) {
             *strategy
                 .outstanding_orders
@@ -537,9 +549,11 @@ fn execute_order(
             name, sell_order, buy_order
         );
     }
-    if let Ok((_, name, mut seller_manufacturer)) = manufacturers.get_mut(sell_order.owner) {
+    if let Ok((_, name, mut wallet, mut seller_manufacturer)) =
+        manufacturers.get_mut(sell_order.owner)
+    {
         // Add money to seller
-        seller_manufacturer.assets.money += sell_order.price;
+        wallet.money += sell_order.price;
         seller_manufacturer
             .assets
             .items_to_sell
