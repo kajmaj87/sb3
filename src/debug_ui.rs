@@ -1,6 +1,6 @@
 use crate::business::Wallet;
 use crate::money::Money;
-use bevy::diagnostic::{Diagnostics, FrameTimeDiagnosticsPlugin};
+use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::prelude::*;
 use bevy_egui::egui::Window;
 use bevy_egui::{egui, EguiContexts};
@@ -93,7 +93,7 @@ impl Performance {
 }
 pub fn debug_window(
     mut egui_context: EguiContexts,
-    diagnostics: Res<Diagnostics>,
+    diagnostics: Res<DiagnosticsStore>,
     performance: Res<Performance>,
     wallets: Query<&Wallet>,
     entities: Query<Entity>,

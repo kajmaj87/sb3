@@ -35,8 +35,7 @@ fn main() {
             filter: "info,wgpu_core=warn,wgpu_hal=warn,sb3=info".into(),
             level: bevy::log::Level::WARN,
         }))
-        .add_plugin(EguiPlugin)
-        .add_plugin(config::ConfigPlugin)
+        .add_plugins((EguiPlugin, config::ConfigPlugin, FrameTimeDiagnosticsPlugin))
         .insert_resource(Days {
             days: 0,
             next_turn: false,
@@ -48,30 +47,28 @@ fn main() {
         .insert_resource(info)
         .insert_resource(debug_ui::Performance::new(100))
         .add_event::<commands::GameCommand>()
-        .add_plugin(FrameTimeDiagnosticsPlugin)
-        .add_system(debug_ui::debug_window)
-        .add_system(user_input::input_system.in_base_set(CoreSet::First))
-        .add_system(commands::command_system)
-        .add_system(
-            date_update_system
-                .run_if(should_advance_day)
-                .in_base_set(CoreSet::PreUpdate),
+        .add_systems(Startup, init::init_manufacturers)
+        .add_systems(First, user_input::input_system)
+        .add_systems(PreUpdate, date_update_system.run_if(should_advance_day))
+        .add_systems(Update, business::create_buy_orders.run_if(next_turn))
+        .add_systems(Update, business::create_sell_orders.run_if(next_turn))
+        .add_systems(
+            Update,
+            business::execute_orders_for_manufacturers.run_if(next_turn),
         )
-        .add_system(count_system.run_if(next_turn))
-        .add_system(business::produce.run_if(next_turn))
-        .add_system(business::create_sell_orders.run_if(next_turn))
-        .add_system(business::update_sell_order_prices.run_if(next_turn))
-        .add_system(business::create_buy_orders.run_if(next_turn))
-        .add_system(business::execute_orders_for_manufacturers.run_if(next_turn))
-        .add_system(business::salary_payout.run_if(next_turn))
-        .add_system(stats::add_sell_orders_to_history.run_if(next_turn))
-        .add_system(turn_end_system.in_base_set(CoreSet::PostUpdate))
-        .add_system(ui::render_panels)
-        .add_system(ui::render_todays_prices)
-        .add_system(ui::render_price_history)
-        .add_system(ui::render_manufacturers_stats)
-        .add_system(ui::render_template_editor)
-        .add_startup_system(init::init_manufacturers)
+        .add_systems(Update, business::produce.run_if(next_turn))
+        .add_systems(Update, business::salary_payout.run_if(next_turn))
+        .add_systems(Update, business::update_sell_order_prices.run_if(next_turn))
+        .add_systems(Update, commands::command_system)
+        .add_systems(Update, count_system.run_if(next_turn))
+        .add_systems(Update, debug_ui::debug_window)
+        .add_systems(Update, stats::add_sell_orders_to_history.run_if(next_turn))
+        .add_systems(Update, ui::render_manufacturers_stats)
+        .add_systems(Update, ui::render_panels)
+        .add_systems(Update, ui::render_price_history)
+        .add_systems(Update, ui::render_template_editor)
+        .add_systems(Update, ui::render_todays_prices)
+        .add_systems(PostUpdate, turn_end_system)
         .run();
 }
 

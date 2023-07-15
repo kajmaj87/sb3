@@ -1,13 +1,13 @@
 use crate::config::Config;
 use crate::Days;
-use bevy::prelude::{EventReader, Res, ResMut, Time};
+use bevy::prelude::{Event, EventReader, Res, ResMut, Time};
 
 const BASE_SECONDS_PER_DAY: f32 = 1.0;
 
+#[derive(Event)]
 pub enum GameCommand {
     SetSpeed(f32),
     AdvanceDay,
-    // ... add more commands here as needed
 }
 pub fn command_system(
     mut game_commands: EventReader<GameCommand>,
