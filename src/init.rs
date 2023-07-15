@@ -4,6 +4,9 @@ use crate::business::{
 };
 use crate::money::money_from_str_or_num;
 use crate::money::Money;
+use crate::people;
+use crate::people::Names;
+use crate::people::Person;
 use bevy::core::Name;
 use bevy::log::info;
 use bevy::prelude::*;
@@ -169,6 +172,7 @@ impl ManufacturerTemplate {
     pub fn to_manufacturer(
         &self,
         production_cycles: HashMap<String, ProductionCycle>,
+        names: &Res<Names>,
         commands: &mut Commands,
     ) -> Vec<ManufacturerBundle> {
         let mut manufacturers = Vec::new();
@@ -176,7 +180,16 @@ impl ManufacturerTemplate {
             let workers = self
                 .workers
                 .iter()
-                .map(|w| commands.spawn((*w, Wallet { money: Money(0) })).id())
+                .map(|w| {
+                    commands
+                        .spawn((
+                            *w,
+                            Wallet { money: Money(0) },
+                            Person {},
+                            Name::new(people::generate_name(names)),
+                        ))
+                        .id()
+                })
                 .collect::<Vec<_>>();
             let manufacturer = ManufacturerBundle {
                 name: Name::new(self.name.clone()),
@@ -239,7 +252,15 @@ impl ProductionCycleTemplate {
     }
 }
 
-pub fn init_manufacturers(mut commands: Commands, mut templates: ResMut<Templates>) {
+pub fn init_names(mut names: ResMut<Names>) {
+    names.load();
+}
+
+pub fn init_manufacturers(
+    mut commands: Commands,
+    mut templates: ResMut<Templates>,
+    names: Res<Names>,
+) {
     templates.load();
     let production_cycles = templates
         .clone()
@@ -253,7 +274,8 @@ pub fn init_manufacturers(mut commands: Commands, mut templates: ResMut<Template
         templates.manufacturers.len()
     );
     for template in templates.clone().manufacturers {
-        let manufacturers = template.to_manufacturer(production_cycles.clone(), &mut commands);
+        let manufacturers =
+            template.to_manufacturer(production_cycles.clone(), &names, &mut commands);
         for manufacturer in manufacturers {
             if manufacturer.manufacturer.production_cycle.input.is_empty() {
                 commands.spawn(manufacturer);

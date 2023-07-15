@@ -3,6 +3,7 @@ use crate::commands::GameCommand;
 use crate::debug_ui::Performance;
 use crate::init::{ManufacturerTemplate, ProductionCycleTemplate, TemplateType, Templates};
 use crate::money::Money;
+use crate::people::Person;
 use crate::stats::PriceHistory;
 use crate::{BuildInfo, Days};
 use bevy::core::Name;
@@ -443,25 +444,25 @@ pub fn render_manufacturers_stats(
                     }
                 }
 
-                for mr in rows.iter() {
+                for r in rows.iter() {
                     body.row(20.0, |mut row| {
                         row.col(|ui| {
-                            ui.label(&mr.name);
+                            ui.label(&r.name);
                         });
                         row.col(|ui| {
-                            ui.label(&mr.money.to_string());
+                            ui.label(&r.money.to_string());
                         });
                         row.col(|ui| {
-                            ui.label(&mr.workers.to_string());
+                            ui.label(&r.workers.to_string());
                         });
                         row.col(|ui| {
-                            ui.label(&mr.items.to_string());
+                            ui.label(&r.items.to_string());
                         });
                         row.col(|ui| {
-                            ui.label(&mr.items_to_sell.to_string());
+                            ui.label(&r.items_to_sell.to_string());
                         });
                         row.col(|ui| {
-                            ui.label(&mr.on_market.to_string());
+                            ui.label(&r.on_market.to_string());
                         });
                     });
                 }
@@ -469,9 +470,66 @@ pub fn render_manufacturers_stats(
     });
 }
 
+#[measured]
+pub fn render_people_stats(
+    mut egui_context: EguiContexts,
+    people: Query<(Entity, &Name, &Wallet, &Person)>,
+    mut sort_order: ResMut<SortOrder>,
+) {
+    Window::new("People").show(egui_context.ctx_mut(), |ui| {
+        let table = TableBuilder::new(ui)
+            // .striped(self.striped)
+            // .resizable(self.resizable)
+            .cell_layout(Layout::left_to_right(Align::Center))
+            .column(Column::auto())
+            .column(Column::initial(80.0).range(80.0..=200.0))
+            .min_scrolled_height(0.0);
+
+        table
+            .header(20.0, |mut header| {
+                header.col(|ui| {
+                    if ui.button("Name").clicked() {
+                        sort_order.people = PeopleSort::Name;
+                    }
+                });
+                header.col(|ui| {
+                    if ui.button("Money").clicked() {
+                        sort_order.people = PeopleSort::Money;
+                    }
+                });
+            })
+            .body(|mut body| {
+                let mut rows = people
+                    .iter()
+                    .map(|(_, name, wallet, _)| PersonRow {
+                        name: name.to_string(),
+                        money: wallet.money,
+                    })
+                    .collect::<Vec<_>>();
+                match sort_order.people {
+                    PeopleSort::Name => rows.sort_by(|a, b| a.name.partial_cmp(&b.name).unwrap()),
+                    PeopleSort::Money => {
+                        rows.sort_by(|a, b| b.money.partial_cmp(&a.money).unwrap())
+                    }
+                }
+
+                for r in rows.iter() {
+                    body.row(20.0, |mut row| {
+                        row.col(|ui| {
+                            ui.label(&r.name);
+                        });
+                        row.col(|ui| {
+                            ui.label(&r.money.to_string());
+                        });
+                    });
+                }
+            });
+    });
+}
 #[derive(Resource)]
 pub struct SortOrder {
     pub manufacturers: ManufacturerSort,
+    pub people: PeopleSort,
 }
 
 pub enum ManufacturerSort {
@@ -483,6 +541,11 @@ pub enum ManufacturerSort {
     OnMarket,
 }
 
+pub enum PeopleSort {
+    Name,
+    Money,
+}
+
 struct ManufacturerRow {
     pub name: String,
     pub money: Money,
@@ -490,6 +553,11 @@ struct ManufacturerRow {
     pub items: usize,
     pub items_to_sell: usize,
     pub on_market: usize,
+}
+
+struct PersonRow {
+    pub name: String,
+    pub money: Money,
 }
 
 // pub fn create_histogram(name: &str, values: &[u64], bins: u32) -> BarChart {
