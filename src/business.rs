@@ -565,3 +565,24 @@ fn execute_order(
         );
     }
 }
+
+pub fn salary_payout(
+    mut workers: Query<(Entity, &mut Wallet, &Worker), Without<Manufacturer>>,
+    mut manufacturers: Query<(Entity, &Name, &mut Wallet, &Manufacturer), Without<Worker>>,
+) {
+    for (_, name, mut manufacturer_wallet, manufacturer) in manufacturers.iter_mut() {
+        for worker in manufacturer.hired_workers.iter() {
+            if let Ok((_, mut worker_wallet, worker)) = workers.get_mut(*worker) {
+                if worker.salary > manufacturer_wallet.money {
+                    debug!(
+                        "{}: Cannot pay salary to worker. Has {} left but salary is {}",
+                        name, manufacturer_wallet.money, worker.salary
+                    );
+                } else {
+                    worker_wallet.money += worker.salary;
+                    manufacturer_wallet.money -= worker.salary;
+                }
+            }
+        }
+    }
+}

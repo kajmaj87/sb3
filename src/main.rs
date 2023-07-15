@@ -63,6 +63,7 @@ fn main() {
         .add_system(business::update_sell_order_prices.run_if(next_turn))
         .add_system(business::create_buy_orders.run_if(next_turn))
         .add_system(business::execute_orders_for_manufacturers.run_if(next_turn))
+        .add_system(business::salary_payout.run_if(next_turn))
         .add_system(stats::add_sell_orders_to_history.run_if(next_turn))
         .add_system(turn_end_system.in_base_set(CoreSet::PostUpdate))
         .add_system(ui::render_panels)
