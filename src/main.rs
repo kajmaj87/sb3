@@ -10,6 +10,7 @@ mod ui;
 mod user_input;
 
 use crate::config::Config;
+use crate::ui::ManufacturerSort;
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
@@ -45,21 +46,28 @@ fn main() {
         .insert_resource(init::Templates::default())
         .insert_resource(info)
         .insert_resource(debug_ui::Performance::new(100))
+        .insert_resource(ui::SortOrder {
+            manufacturers: ManufacturerSort::Name,
+        })
         .add_event::<commands::GameCommand>()
         .add_systems(Startup, init::init_manufacturers)
         .add_systems(First, user_input::input_system)
         .add_systems(PreUpdate, date_update_system.run_if(should_advance_day))
-        .add_systems(Update, business::create_buy_orders.run_if(next_turn))
-        .add_systems(Update, business::create_sell_orders.run_if(next_turn))
         .add_systems(
             Update,
-            business::execute_orders_for_manufacturers.run_if(next_turn),
+            (
+                // those system run in sequence
+                business::salary_payout,
+                business::execute_orders_for_manufacturers,
+                business::produce,
+                (business::create_buy_orders, business::create_sell_orders), // those run in parallel
+                business::update_sell_order_prices,
+                stats::add_sell_orders_to_history,
+            )
+                .chain()
+                .run_if(next_turn),
         )
-        .add_systems(Update, business::produce.run_if(next_turn))
-        .add_systems(Update, business::salary_payout.run_if(next_turn))
-        .add_systems(Update, business::update_sell_order_prices.run_if(next_turn))
         .add_systems(Update, commands::command_system)
-        .add_systems(Update, stats::add_sell_orders_to_history.run_if(next_turn))
         .add_systems(Update, debug_ui::debug_window)
         .add_systems(Update, ui::render_manufacturers_stats)
         .add_systems(Update, ui::render_panels)

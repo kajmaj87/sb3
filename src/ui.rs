@@ -6,7 +6,7 @@ use crate::money::Money;
 use crate::stats::PriceHistory;
 use crate::{BuildInfo, Days};
 use bevy::core::Name;
-use bevy::prelude::{Entity, EventWriter, Query, Res, ResMut};
+use bevy::prelude::{Entity, EventWriter, Query, Res, ResMut, Resource};
 use bevy_egui::egui::plot::{
     BoxElem, BoxPlot, BoxSpread, Legend, Line, LineStyle, Plot, PlotPoints,
 };
@@ -36,7 +36,7 @@ pub fn render_template_editor(mut egui_context: EguiContexts, mut templates: Res
                 TemplateType::ProductionCycles,
                 "Production cycles",
             );
-            let mut json_error= "".to_string();
+            let mut json_error = "".to_string();
             let (text, json_error) = {
                 match templates.selected_template {
                     TemplateType::Manufacturers => {
@@ -352,6 +352,7 @@ pub fn render_manufacturers_stats(
     mut egui_context: EguiContexts,
     manufacturers: Query<(Entity, &Name, &Wallet, &Manufacturer)>,
     sell_orders: Query<&SellOrder>,
+    mut sort_order: ResMut<SortOrder>,
 ) {
     Window::new("Manufacturers").show(egui_context.ctx_mut(), |ui| {
         let mut owner_counts: HashMap<Entity, usize> = HashMap::new();
@@ -374,79 +375,121 @@ pub fn render_manufacturers_stats(
         table
             .header(20.0, |mut header| {
                 header.col(|ui| {
-                    ui.strong("Name");
+                    if ui.button("Name").clicked() {
+                        sort_order.manufacturers = ManufacturerSort::Name;
+                    }
                 });
                 header.col(|ui| {
-                    ui.strong("Money");
+                    if ui.button("Money").clicked() {
+                        sort_order.manufacturers = ManufacturerSort::Money;
+                    }
                 });
                 header.col(|ui| {
-                    ui.strong("Workers");
+                    if ui.button("Workers").clicked() {
+                        sort_order.manufacturers = ManufacturerSort::Workers;
+                    }
                 });
                 header.col(|ui| {
-                    ui.strong("Items");
+                    if ui.button("Items").clicked() {
+                        sort_order.manufacturers = ManufacturerSort::Items;
+                    }
                 });
                 header.col(|ui| {
-                    ui.strong("Items to sell");
+                    if ui.button("Items to sell").clicked() {
+                        sort_order.manufacturers = ManufacturerSort::ItemsToSell;
+                    }
                 });
                 header.col(|ui| {
-                    ui.strong("On Market");
+                    if ui.button("On market").clicked() {
+                        sort_order.manufacturers = ManufacturerSort::OnMarket;
+                    }
                 });
             })
             .body(|mut body| {
-                for (entity, name, wallet, manufacturer) in manufacturers.iter() {
+                let mut rows = manufacturers
+                    .iter()
+                    .map(|(entity, name, wallet, manufacturer)| ManufacturerRow {
+                        name: name.to_string(),
+                        money: wallet.money,
+                        workers: manufacturer.hired_workers.len(),
+                        items: manufacturer
+                            .assets
+                            .items
+                            .values()
+                            .map(|x| x.len())
+                            .sum::<usize>(),
+                        items_to_sell: manufacturer.assets.items_to_sell.len(),
+                        on_market: *owner_counts.get(&entity).unwrap_or(&0),
+                    })
+                    .collect::<Vec<_>>();
+                match sort_order.manufacturers {
+                    ManufacturerSort::Name => {
+                        rows.sort_by(|a, b| a.name.partial_cmp(&b.name).unwrap())
+                    }
+                    ManufacturerSort::Money => {
+                        rows.sort_by(|a, b| b.money.partial_cmp(&a.money).unwrap())
+                    }
+                    ManufacturerSort::Workers => {
+                        rows.sort_by(|a, b| b.workers.partial_cmp(&a.workers).unwrap())
+                    }
+                    ManufacturerSort::Items => {
+                        rows.sort_by(|a, b| b.items.partial_cmp(&a.items).unwrap())
+                    }
+                    ManufacturerSort::ItemsToSell => {
+                        rows.sort_by(|a, b| b.items_to_sell.partial_cmp(&a.items_to_sell).unwrap())
+                    }
+                    ManufacturerSort::OnMarket => {
+                        rows.sort_by(|a, b| b.on_market.partial_cmp(&a.on_market).unwrap())
+                    }
+                }
+
+                for mr in rows.iter() {
                     body.row(20.0, |mut row| {
                         row.col(|ui| {
-                            ui.label(name.as_str());
+                            ui.label(&mr.name);
                         });
                         row.col(|ui| {
-                            ui.label(wallet.money.to_string());
+                            ui.label(&mr.money.to_string());
                         });
                         row.col(|ui| {
-                            ui.label(manufacturer.hired_workers.len().to_string());
+                            ui.label(&mr.workers.to_string());
                         });
                         row.col(|ui| {
-                            ui.label(
-                                manufacturer
-                                    .assets
-                                    .items
-                                    .values()
-                                    .map(|x| x.len())
-                                    .sum::<usize>()
-                                    .to_string(),
-                            );
+                            ui.label(&mr.items.to_string());
                         });
                         row.col(|ui| {
-                            ui.label(manufacturer.assets.items_to_sell.len().to_string());
+                            ui.label(&mr.items_to_sell.to_string());
                         });
                         row.col(|ui| {
-                            ui.label(owner_counts.get(&entity).unwrap_or(&0).to_string());
+                            ui.label(&mr.on_market.to_string());
                         });
                     });
                 }
             });
-        // for  in 0..NUM_MANUAL_ROWS {
-        //     let is_thick = thick_row(row_index);
-        //     let row_height = if is_thick { 30.0 } else { 18.0 };
-        //     body.row(row_height, |mut row| {
-        //         row.col(|ui| {
-        //             ui.label(row_index.to_string());
-        //         });
-        //         row.col(|ui| {
-        //             expanding_content(ui);
-        //         });
-        //         row.col(|ui| {
-        //             ui.label(long_text(row_index));
-        //         });
-        //         row.col(|ui| {
-        //             ui.style_mut().wrap = Some(false);
-        //             if is_thick {
-        //                 ui.heading("Extra thick row");
-        //             } else {
-        //                 ui.label("Normal row");
-        //             }
-        //         });
-        //     });
     });
+}
+
+#[derive(Resource)]
+pub struct SortOrder {
+    pub manufacturers: ManufacturerSort,
+}
+
+pub enum ManufacturerSort {
+    Name,
+    Money,
+    Workers,
+    Items,
+    ItemsToSell,
+    OnMarket,
+}
+
+struct ManufacturerRow {
+    pub name: String,
+    pub money: Money,
+    pub workers: usize,
+    pub items: usize,
+    pub items_to_sell: usize,
+    pub on_market: usize,
 }
 
 // pub fn create_histogram(name: &str, values: &[u64], bins: u32) -> BarChart {
