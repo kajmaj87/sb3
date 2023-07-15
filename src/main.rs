@@ -41,7 +41,6 @@ fn main() {
             next_turn: false,
             last_update: 0.0,
         })
-        .insert_resource(Counter(0))
         .insert_resource(stats::PriceHistory::default())
         .insert_resource(init::Templates::default())
         .insert_resource(info)
@@ -60,9 +59,8 @@ fn main() {
         .add_systems(Update, business::salary_payout.run_if(next_turn))
         .add_systems(Update, business::update_sell_order_prices.run_if(next_turn))
         .add_systems(Update, commands::command_system)
-        .add_systems(Update, count_system.run_if(next_turn))
-        .add_systems(Update, debug_ui::debug_window)
         .add_systems(Update, stats::add_sell_orders_to_history.run_if(next_turn))
+        .add_systems(Update, debug_ui::debug_window)
         .add_systems(Update, ui::render_manufacturers_stats)
         .add_systems(Update, ui::render_panels)
         .add_systems(Update, ui::render_price_history)
@@ -87,15 +85,8 @@ impl Days {
     }
 }
 
-#[derive(Resource)]
-pub struct Counter(usize);
-
 fn date_update_system(mut days: ResMut<Days>, time: Res<Time>) {
     days.next_day(&time);
-}
-
-fn count_system(mut counter: ResMut<Counter>) {
-    counter.0 += 1;
 }
 
 fn should_advance_day(time: Res<Time>, days: Res<Days>, config: Res<Config>) -> bool {
