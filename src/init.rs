@@ -1,6 +1,6 @@
 use crate::business::{
     BuyStrategy, Inventory, ItemType, Manufacturer, ManufacturerBundle, ProductionCycle,
-    SellStrategy, Wallet, Worker,
+    SellStrategy, TransactionLog, Wallet, Worker,
 };
 use crate::money::money_from_str_or_num;
 use crate::money::Money;
@@ -186,6 +186,7 @@ impl ManufacturerTemplate {
                             *w,
                             Wallet { money: Money(0) },
                             Person::default(),
+                            TransactionLog::default(),
                             Name::new(people::generate_name(names)),
                         ))
                         .id()
@@ -207,6 +208,7 @@ impl ManufacturerTemplate {
                     money: self.money,
                 },
                 sell_strategy: self.sell_strategy,
+                transaction_log: TransactionLog::default(),
             };
             manufacturers.push(manufacturer);
         }

@@ -116,7 +116,7 @@ pub fn create_buy_orders_for_people(
         // Get the corresponding item
         let (item_name, _util) = utilities[index];
 
-        info!("Chosen item for person {} is {}", name, item_name);
+        trace!("Chosen item for person {} is {}", name, item_name);
         let buy_order = BuyOrder {
             item_type: ItemType {
                 name: item_name.to_string(),

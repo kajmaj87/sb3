@@ -33,7 +33,7 @@ fn main() {
     info!("Build Info: {:?}", info);
     App::new()
         .add_plugins(DefaultPlugins.set(LogPlugin {
-            filter: "info,wgpu_core=warn,wgpu_hal=warn,sb3=info".into(),
+            filter: "info,wgpu_core=warn,wgpu_hal=warn,sb3=debug".into(),
             level: bevy::log::Level::WARN,
         }))
         .add_plugins((EguiPlugin, config::ConfigPlugin, FrameTimeDiagnosticsPlugin))
@@ -62,7 +62,8 @@ fn main() {
                 // those system run in sequence
                 business::order_expiration,
                 business::salary_payout,
-                business::execute_orders_for_manufacturers,
+                business::execute_orders,
+                business::process_transactions,
                 business::produce,
                 (business::create_buy_orders, business::create_sell_orders), // those run in parallel
                 business::update_sell_order_prices,

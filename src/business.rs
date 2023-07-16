@@ -1,5 +1,7 @@
 use crate::debug_ui::Performance;
 use crate::money::Money;
+use crate::people::Person;
+use crate::Days;
 use bevy::prelude::*;
 use macros::measured;
 use rand::seq::SliceRandom;
@@ -37,6 +39,7 @@ pub struct ManufacturerBundle {
     pub manufacturer: Manufacturer,
     pub sell_strategy: SellStrategy,
     pub wallet: Wallet,
+    pub transaction_log: TransactionLog,
 }
 
 #[derive(Component, Debug)]
@@ -58,6 +61,29 @@ pub struct Item {
     production_cost: Money,
     buy_cost: Money,
     // owner: Entity,
+}
+
+#[derive(Debug, Clone)]
+pub enum TransactionType {
+    Buy,
+    Sell,
+}
+
+#[derive(Debug, Clone)]
+pub struct Transaction {
+    trasaction_type: TransactionType,
+    buyer: Entity,
+    seller: Entity,
+    item: Entity,
+    itemType: ItemType,
+    price: Money,
+    date: usize,
+}
+
+#[derive(Component, Debug, Default)]
+pub struct TransactionLog {
+    unprocessed_transactions: Vec<Transaction>,
+    history: Vec<Transaction>,
 }
 
 #[derive(Component, Debug)]
@@ -406,13 +432,14 @@ pub fn create_buy_orders(
 }
 
 #[measured]
-pub fn execute_orders_for_manufacturers(
+pub fn execute_orders(
     mut commands: Commands,
     mut buy_orders: Query<(Entity, &BuyOrder)>,
     mut sell_orders: Query<(Entity, &SellOrder)>,
-    mut manufacturers: Query<(Entity, &Name, &mut Wallet, &mut Manufacturer)>,
+    mut trade_participants: Query<(Entity, &Name, &mut Wallet, &mut TransactionLog)>,
     mut buy_strategy: Query<(Entity, &mut BuyStrategy)>,
     mut items: Query<(Entity, &mut Item)>,
+    date: Res<Days>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -466,11 +493,12 @@ pub fn execute_orders_for_manufacturers(
                     OrderType::Market => {
                         execute_order(
                             &mut buy_strategy,
-                            &mut manufacturers,
+                            &mut trade_participants,
                             &mut commands,
                             (sell_order_id, sell_order),
                             (buy_order_id, buy_order),
                             &mut items,
+                            &date,
                         );
                     } // OrderType::Limit(max_price) => {
                       //     if sell_order.price <= max_price {
@@ -486,17 +514,23 @@ pub fn execute_orders_for_manufacturers(
                       // }
                 }
             }
+        } else {
+            warn!(
+                "No sell orders for {} (buy order: {:?})",
+                buy_order.item_type.name, buy_order
+            );
         }
     }
 }
 
 fn execute_order(
     buy_strategy: &mut Query<(Entity, &mut BuyStrategy)>,
-    manufacturers: &mut Query<(Entity, &Name, &mut Wallet, &mut Manufacturer)>,
+    trade_participants: &mut Query<(Entity, &Name, &mut Wallet, &mut TransactionLog)>,
     commands: &mut Commands,
     sell_order: (Entity, &SellOrder),
     buy_order: (Entity, &BuyOrder),
     items: &mut Query<(Entity, &mut Item)>,
+    date: &Res<Days>,
 ) {
     let (sell_order_id, sell_order) = sell_order;
     let (buy_order_id, buy_order) = buy_order;
@@ -507,7 +541,7 @@ fn execute_order(
     assert_eq!(buy_item_type, sell_item_type);
 
     // Phase 1: Do all the checks and computations
-    if let Ok((_, name, wallet, _)) = manufacturers.get_mut(buy_order.buyer) {
+    if let Ok((_, name, wallet, _)) = trade_participants.get_mut(buy_order.buyer) {
         if wallet.money < sell_order.price {
             debug!(
                 "{}: Cannot execute the order: buyer does not have enough money",
@@ -515,6 +549,8 @@ fn execute_order(
             );
             return;
         }
+    } else {
+        warn!("Buyer does not exist");
     }
     // if let Ok((_, mut seller_manufacturer)) = manufacturers.get_mut(sell_order.owner) {
     //     if let Some(_) = seller_manufacturer.assets.items_to_sell.take(&sell_order.item) {
@@ -523,8 +559,8 @@ fn execute_order(
     // }
 
     // Phase 2: Execute the operations
-    if let Ok((_, name, mut wallet, mut buyer_manufacturer)) =
-        manufacturers.get_mut(buy_order.buyer)
+    if let Ok((buyer, name, mut wallet, mut transaction_log)) =
+        trade_participants.get_mut(buy_order.buyer)
     {
         // Transfer money from buyer to seller
         wallet.money -= sell_order.price;
@@ -539,32 +575,90 @@ fn execute_order(
         if let Ok((_, mut item)) = items.get_mut(sell_order.item) {
             item.buy_cost = sell_order.price;
         }
-        buyer_manufacturer
-            .assets
-            .items
-            .entry(buy_item_type.clone())
-            .or_default()
-            .push(sell_order.item);
+        transaction_log.unprocessed_transactions.push(Transaction {
+            trasaction_type: TransactionType::Buy,
+            buyer: buy_order.buyer,
+            seller: sell_order.seller,
+            item: sell_order.item,
+            itemType: sell_order.item_type.clone(),
+            price: sell_order.price,
+            date: date.days,
+        });
+        // .assets
+        // .items
+        // .entry(buy_item_type.clone())
+        // .or_default()
+        // .push(sell_order.item);
         commands.entity(buy_order_id).despawn();
         debug!(
             "{}: !!!! Executed order: {:?} -> {:?} (buyer got his goods)",
-            name, sell_order, buy_order
+            name, buy_order, sell_order
         );
+    } else {
+        warn!("Buyer does not exist");
     }
-    if let Ok((_, name, mut wallet, mut seller_manufacturer)) =
-        manufacturers.get_mut(sell_order.seller)
+    if let Ok((_, name, mut wallet, mut transaction_log)) =
+        trade_participants.get_mut(sell_order.seller)
     {
         // Add money to seller
         wallet.money += sell_order.price;
-        seller_manufacturer
-            .assets
-            .items_to_sell
-            .remove(&sell_order.item);
+        transaction_log.unprocessed_transactions.push(Transaction {
+            trasaction_type: TransactionType::Sell,
+            buyer: buy_order.buyer,
+            seller: sell_order.seller,
+            item: sell_order.item,
+            itemType: sell_order.item_type.clone(),
+            price: sell_order.price,
+            date: date.days,
+        });
         commands.entity(sell_order_id).despawn();
         debug!(
             "{}: !!!! Executed order: {:?} -> {:?} (seller got his money)",
             name, sell_order, buy_order
         );
+    } else {
+        warn!("Seller does not exist");
+    }
+}
+
+pub fn process_transactions(
+    mut transaction_logs: Query<(Entity, &mut TransactionLog)>,
+    mut manufacturers: Query<(Entity, &mut Manufacturer)>,
+    mut people: Query<(Entity, &mut Person)>,
+) {
+    for (entity, mut transaction_log) in transaction_logs.iter_mut() {
+        let mut unprocessed_transactions = transaction_log.unprocessed_transactions.clone();
+        for transaction in transaction_log.unprocessed_transactions.iter() {
+            match transaction.trasaction_type {
+                TransactionType::Buy => {
+                    if let Ok((_, mut person)) = people.get_mut(transaction.buyer) {
+                        person
+                            .assets
+                            .items
+                            .entry(transaction.itemType.clone())
+                            .or_default()
+                            .push(transaction.item);
+                    }
+                    if let Ok((_, mut manufacturer)) = manufacturers.get_mut(transaction.buyer) {
+                        manufacturer
+                            .assets
+                            .items
+                            .entry(transaction.itemType.clone())
+                            .or_default()
+                            .push(transaction.item);
+                    }
+                }
+                TransactionType::Sell => {
+                    if let Ok((_, mut manufacturer)) = manufacturers.get_mut(transaction.seller) {
+                        manufacturer.assets.items_to_sell.remove(&transaction.item);
+                    }
+                }
+            }
+        }
+        transaction_log
+            .history
+            .append(&mut unprocessed_transactions);
+        transaction_log.unprocessed_transactions.clear();
     }
 }
 

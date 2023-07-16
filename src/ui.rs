@@ -568,7 +568,7 @@ pub fn render_people_stats(
                             ui.label(&r.items.to_string());
                         });
                         row.col(|ui| {
-                            ui.label(&r.utility.to_string());
+                            ui.label(&r.utility.log10().to_string());
                         });
                     });
                 }
