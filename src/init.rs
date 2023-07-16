@@ -5,7 +5,7 @@ use crate::business::{
 use crate::money::money_from_str_or_num;
 use crate::money::Money;
 use crate::people;
-use crate::people::Person;
+use crate::people::{Items, Person};
 use crate::people::{Names, Needs};
 use bevy::core::Name;
 use bevy::log::info;
@@ -254,9 +254,10 @@ impl ProductionCycleTemplate {
     }
 }
 
-pub fn init_people(mut names: ResMut<Names>, mut needs: ResMut<Needs>) {
+pub fn init_people(mut names: ResMut<Names>, mut needs: ResMut<Needs>, mut items: ResMut<Items>) {
     names.load();
     needs.load();
+    items.load();
 }
 
 pub fn init_manufacturers(

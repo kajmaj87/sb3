@@ -1,11 +1,18 @@
 {
   "food": {
-    "base": 10,
+    "base": 50,
     "preference": 0.6,
     "satisfied_by": {
       "processed food": 10,
       "raw food": 2,
       "Hydroponic HomeKit": 20
+    }
+  },
+  "clothing": {
+    "base": 10,
+    "preference": 0.45,
+    "satisfied_by": {
+      "FutureWear": 10
     }
   },
   "energy": {

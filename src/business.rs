@@ -71,13 +71,13 @@ pub enum TransactionType {
 
 #[derive(Debug, Clone)]
 pub struct Transaction {
-    trasaction_type: TransactionType,
+    transaction_type: TransactionType,
     buyer: Entity,
     seller: Entity,
     item: Entity,
-    itemType: ItemType,
-    price: Money,
-    date: usize,
+    item_type: ItemType,
+    // price: Money,
+    // date: usize,
 }
 
 #[derive(Component, Debug, Default)]
@@ -314,7 +314,7 @@ pub fn create_sell_orders(
                 let sell_order = SellOrder {
                     item,
                     item_type: item_cost.item_type.clone(),
-                    seller: seller,
+                    seller,
                     price: item_cost.production_cost
                         * strategy.current_margin.max(strategy.min_margin),
                     base_price: item_cost.production_cost,
@@ -382,21 +382,19 @@ pub fn create_buy_orders(
             if cycles_possible_with_current_inventory < strategy.target_production_cycles {
                 let current_orders = *strategy.outstanding_orders.get(material).unwrap_or(&0);
                 debug!(
-                    "{}: I need to buy {} for {} more production cycles. I already have {} and {:?} in orders",
+                    "{}: I need to buy {} for {} more production cycles ({} in total). I already have {} and {:?} in orders",
                     name,
                     material.name,
                     strategy.target_production_cycles - cycles_possible_with_current_inventory,
+                    (strategy.target_production_cycles - cycles_possible_with_current_inventory) * quantity_needed,
                     inventory_quantity,
-                    strategy.outstanding_orders
+                    current_orders
                 );
-                let quantity_to_buy = (strategy.target_production_cycles
+                let quantity_to_buy = ((strategy.target_production_cycles
                     - cycles_possible_with_current_inventory)
-                    * quantity_needed
-                    - current_orders;
-                strategy
-                    .outstanding_orders
-                    .insert(material.clone(), current_orders + quantity_to_buy);
-                if quantity_to_buy == 0 {
+                    * quantity_needed) as i32
+                    - current_orders as i32;
+                if quantity_to_buy <= 0 {
                     debug!(
                         "{}: No need to buy any more {}, I already have {} and {} in orders",
                         name,
@@ -405,6 +403,10 @@ pub fn create_buy_orders(
                         strategy.outstanding_orders.get(material).unwrap_or(&0)
                     );
                     continue;
+                } else {
+                    strategy
+                        .outstanding_orders
+                        .insert(material.clone(), current_orders + quantity_to_buy as u32);
                 }
 
                 let buy_order = BuyOrder {
@@ -431,6 +433,7 @@ pub fn create_buy_orders(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 #[measured]
 pub fn execute_orders(
     mut commands: Commands,
@@ -442,12 +445,15 @@ pub fn execute_orders(
     date: Res<Days>,
 ) {
     let mut rng = rand::thread_rng();
+    let mut already_sold = HashSet::new();
 
     // Iterate over each buy order
     for (buy_order_id, buy_order) in buy_orders.iter_mut() {
         let matching_sell_orders: Vec<_> = sell_orders
             .iter_mut()
-            .filter(|(_, sell_order)| sell_order.item_type == buy_order.item_type) // Match by material
+            .filter(|(order_id, sell_order)| {
+                sell_order.item_type == buy_order.item_type && !already_sold.contains(order_id)
+            }) // Match by material
             .collect();
 
         if !matching_sell_orders.is_empty() {
@@ -491,7 +497,7 @@ pub fn execute_orders(
             if let Some(&(sell_order_id, sell_order)) = sorted_sample.get(index) {
                 match buy_order.order {
                     OrderType::Market => {
-                        execute_order(
+                        if execute_order(
                             &mut buy_strategy,
                             &mut trade_participants,
                             &mut commands,
@@ -499,7 +505,9 @@ pub fn execute_orders(
                             (buy_order_id, buy_order),
                             &mut items,
                             &date,
-                        );
+                        ) {
+                            already_sold.insert(sell_order_id);
+                        }
                     } // OrderType::Limit(max_price) => {
                       //     if sell_order.price <= max_price {
                       //         execute_order(
@@ -515,9 +523,10 @@ pub fn execute_orders(
                 }
             }
         } else {
-            warn!(
+            trace!(
                 "No sell orders for {} (buy order: {:?})",
-                buy_order.item_type.name, buy_order
+                buy_order.item_type.name,
+                buy_order
             );
         }
     }
@@ -530,8 +539,8 @@ fn execute_order(
     sell_order: (Entity, &SellOrder),
     buy_order: (Entity, &BuyOrder),
     items: &mut Query<(Entity, &mut Item)>,
-    date: &Res<Days>,
-) {
+    _date: &Res<Days>,
+) -> bool {
     let (sell_order_id, sell_order) = sell_order;
     let (buy_order_id, buy_order) = buy_order;
     let sell_item_type = &sell_order.item_type;
@@ -547,7 +556,7 @@ fn execute_order(
                 "{}: Cannot execute the order: buyer does not have enough money",
                 name
             );
-            return;
+            return false;
         }
     } else {
         warn!("Buyer does not exist");
@@ -559,7 +568,7 @@ fn execute_order(
     // }
 
     // Phase 2: Execute the operations
-    if let Ok((buyer, name, mut wallet, mut transaction_log)) =
+    if let Ok((_, name, mut wallet, mut transaction_log)) =
         trade_participants.get_mut(buy_order.buyer)
     {
         // Transfer money from buyer to seller
@@ -576,19 +585,14 @@ fn execute_order(
             item.buy_cost = sell_order.price;
         }
         transaction_log.unprocessed_transactions.push(Transaction {
-            trasaction_type: TransactionType::Buy,
+            transaction_type: TransactionType::Buy,
             buyer: buy_order.buyer,
             seller: sell_order.seller,
             item: sell_order.item,
-            itemType: sell_order.item_type.clone(),
-            price: sell_order.price,
-            date: date.days,
+            item_type: sell_order.item_type.clone(),
+            // price: sell_order.price,
+            // date: date.days,
         });
-        // .assets
-        // .items
-        // .entry(buy_item_type.clone())
-        // .or_default()
-        // .push(sell_order.item);
         commands.entity(buy_order_id).despawn();
         debug!(
             "{}: !!!! Executed order: {:?} -> {:?} (buyer got his goods)",
@@ -603,22 +607,24 @@ fn execute_order(
         // Add money to seller
         wallet.money += sell_order.price;
         transaction_log.unprocessed_transactions.push(Transaction {
-            trasaction_type: TransactionType::Sell,
+            transaction_type: TransactionType::Sell,
             buyer: buy_order.buyer,
             seller: sell_order.seller,
             item: sell_order.item,
-            itemType: sell_order.item_type.clone(),
-            price: sell_order.price,
-            date: date.days,
+            item_type: sell_order.item_type.clone(),
+            // price: sell_order.price,
+            // date: date.days,
         });
         commands.entity(sell_order_id).despawn();
         debug!(
             "{}: !!!! Executed order: {:?} -> {:?} (seller got his money)",
             name, sell_order, buy_order
         );
+        return true;
     } else {
         warn!("Seller does not exist");
     }
+    false
 }
 
 pub fn process_transactions(
@@ -626,16 +632,16 @@ pub fn process_transactions(
     mut manufacturers: Query<(Entity, &mut Manufacturer)>,
     mut people: Query<(Entity, &mut Person)>,
 ) {
-    for (entity, mut transaction_log) in transaction_logs.iter_mut() {
+    for (_, mut transaction_log) in transaction_logs.iter_mut() {
         let mut unprocessed_transactions = transaction_log.unprocessed_transactions.clone();
         for transaction in transaction_log.unprocessed_transactions.iter() {
-            match transaction.trasaction_type {
+            match transaction.transaction_type {
                 TransactionType::Buy => {
                     if let Ok((_, mut person)) = people.get_mut(transaction.buyer) {
                         person
                             .assets
                             .items
-                            .entry(transaction.itemType.clone())
+                            .entry(transaction.item_type.clone())
                             .or_default()
                             .push(transaction.item);
                     }
@@ -643,7 +649,7 @@ pub fn process_transactions(
                         manufacturer
                             .assets
                             .items
-                            .entry(transaction.itemType.clone())
+                            .entry(transaction.item_type.clone())
                             .or_default()
                             .push(transaction.item);
                     }

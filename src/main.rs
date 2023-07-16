@@ -33,7 +33,7 @@ fn main() {
     info!("Build Info: {:?}", info);
     App::new()
         .add_plugins(DefaultPlugins.set(LogPlugin {
-            filter: "info,wgpu_core=warn,wgpu_hal=warn,sb3=debug".into(),
+            filter: "info,wgpu_core=warn,wgpu_hal=warn,sb3=info".into(),
             level: bevy::log::Level::WARN,
         }))
         .add_plugins((EguiPlugin, config::ConfigPlugin, FrameTimeDiagnosticsPlugin))
@@ -46,6 +46,7 @@ fn main() {
         .insert_resource(init::Templates::default())
         .insert_resource(people::Names::default())
         .insert_resource(people::Needs::default())
+        .insert_resource(people::Items::default())
         .insert_resource(info)
         .insert_resource(debug_ui::Performance::new(100))
         .insert_resource(ui::SortOrder {
@@ -67,6 +68,7 @@ fn main() {
                 business::produce,
                 (business::create_buy_orders, business::create_sell_orders), // those run in parallel
                 business::update_sell_order_prices,
+                people::consume,
                 people::create_buy_orders_for_people,
                 stats::add_sell_orders_to_history,
             )

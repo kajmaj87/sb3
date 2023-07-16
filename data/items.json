@@ -1,0 +1,23 @@
+{
+  "Hydroponic HomeKit": {
+    "consumption_rate": 0.01
+  },
+  "Luxury Space Cruise Ticket": {
+    "consumption_rate": 0.001
+  },
+  "SmartHome installation": {
+    "consumption_rate": 0.005
+  },
+  "processed food": {
+    "consumption_rate": 0.2
+  },
+  "raw food": {
+    "consumption_rate": 0.5
+  },
+  "energy": {
+    "consumption_rate": 0.1
+  },
+  "FutureWear": {
+    "consumption_rate": 0.02
+  }
+}

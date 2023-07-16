@@ -4,6 +4,7 @@ use crate::stats::PriceHistory;
 use bevy::prelude::*;
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::SliceRandom;
+use rand::Rng;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -27,6 +28,24 @@ pub struct Need {
 #[derive(Resource, Default)]
 pub struct Needs {
     pub needs: HashMap<String, Need>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Item {
+    consumption_rate: f64,
+}
+
+#[derive(Debug, Deserialize, Resource, Default)]
+pub struct Items {
+    pub items: HashMap<String, Item>,
+}
+
+impl Items {
+    pub fn load(&mut self) {
+        let items = std::fs::read_to_string("data/items.json").unwrap();
+        let items: HashMap<String, Item> = serde_json::from_str(&items).unwrap();
+        self.items = items;
+    }
 }
 
 impl Needs {
@@ -75,31 +94,67 @@ pub struct Person {
 }
 
 #[measured]
+pub fn consume(
+    mut people: Query<(Entity, &Name, &mut Person)>,
+    items: Res<Items>,
+    mut commands: Commands,
+) {
+    let mut rng = rand::thread_rng();
+    for (_, name, mut person) in people.iter_mut() {
+        let mut amount_to_remove: HashMap<ItemType, usize> = HashMap::new();
+        for (item_type, all_items) in person.assets.items.iter_mut() {
+            let consumption_rate = items
+                .items
+                .get(&item_type.name)
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Item {} does not have consumption rate! Fix this in items.json",
+                        &item_type.name
+                    )
+                })
+                .consumption_rate;
+            for _ in all_items.iter_mut() {
+                if rng.gen_range(0.0..=1.0) < consumption_rate {
+                    debug!("{} consumed {}", name, item_type.name);
+                    amount_to_remove
+                        .entry(item_type.clone())
+                        .and_modify(|e| *e += 1)
+                        .or_insert(1);
+                }
+            }
+        }
+
+        for (item_type, amount) in amount_to_remove.iter() {
+            person
+                .assets
+                .items
+                .get_mut(item_type)
+                .unwrap()
+                .drain(0..*amount)
+                .for_each(|e| commands.entity(e).despawn());
+        }
+    }
+}
+
+#[measured]
 pub fn create_buy_orders_for_people(
     mut people: Query<(Entity, &Name, &Wallet, &mut Person)>,
     needs: Res<Needs>,
     price_history: Res<PriceHistory>,
     mut commands: Commands,
 ) {
-    let mut marginal_utilities: HashMap<(String, String), f64> = HashMap::new();
     let mut rng = rand::thread_rng();
-    for (buyer, name, wallet, mut person) in people.iter_mut() {
+    for (buyer, name, _, mut person) in people.iter_mut() {
         let total_assets = calculate_total_items(&person.assets);
         let mut person_marginal_utilities: HashMap<String, f64> = HashMap::new();
-        for need in needs
-            .needs
-            .iter()
-            .map(|(name, n)| n.satisfied_by.keys())
-            .flatten()
-        {
+        for need in needs.needs.iter().flat_map(|(_, n)| n.satisfied_by.keys()) {
             let item_type = ItemType {
                 name: need.to_string(),
             };
-            let util = marginal_utility(&needs, &name, &total_assets, &price_history, &item_type);
-            // marginal_utilities.insert((name.to_string().clone(), item_type.name.clone()), util);
+            let util = marginal_utility(&needs, name, &total_assets, &price_history, &item_type);
             person_marginal_utilities.insert(item_type.name.clone(), util);
         }
-        person.utility = utility(&needs, &name, &total_assets, &price_history);
+        person.utility = utility(&needs, name, &total_assets, &price_history);
         // Sort by utility
         let mut utilities: Vec<(&String, &f64)> = person_marginal_utilities.iter().collect();
         utilities.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap());
@@ -130,63 +185,6 @@ pub fn create_buy_orders_for_people(
             Name::new(format!("Consumer {} buy order @Market", item_name)),
         ));
     }
-
-    //     let mut sums: HashMap<String, f64> = HashMap::new();
-    //     for ((person_name, _), &util) in &marginal_utilities {
-    //         let entry = sums.entry(person_name.clone()).or_insert(0.0);
-    //         *entry += util;
-    //     }
-    //
-    // // Normalize utilities and convert HashMap to Vec for sorting
-    //     let mut marginal_utilities_vec: Vec<((String, String), f64)> = marginal_utilities.drain()
-    //         .map(|((person_name, item_name), util)| {
-    //             let sum = sums.get(&person_name).unwrap();
-    //             ((person_name, item_name), util / sum)
-    //         })
-    //         .collect();
-    //
-    // // Sort by person name first, then by utility value in descending order
-    //     marginal_utilities_vec.sort_by(|((person_a, _), util_a), ((person_b, _), util_b)| {
-    //         let person_cmp = person_a.cmp(person_b);
-    //         if person_cmp == std::cmp::Ordering::Equal {
-    //             util_b.partial_cmp(util_a).unwrap_or(std::cmp::Ordering::Equal)
-    //         } else {
-    //             person_cmp
-    //         }
-    //     });
-    //
-    // // Iterate and print
-    // //     for ((person_name, item_name), util) in marginal_utilities_vec {
-    //     // info!("Marginal utility for person {} for {} is {:.3}", person_name, item_name, util);
-    //     // }
-    //
-    //     let mut rng = rand::thread_rng();
-    //
-    // // Group utilities by person
-    //     let mut utilities_by_person: HashMap<String, Vec<((String, String), f64)>> = HashMap::new();
-    //     for ((person_name, item_name), util) in marginal_utilities {
-    //         utilities_by_person.entry(person_name.clone()).or_insert_with(Vec::new).push(((person_name.clone(), item_name.clone()), util));
-    //     }
-    //
-    // // Select an item for each person
-    //     for (person_name, mut utilities) in utilities_by_person {
-    //         // Sort by utility
-    //         utilities.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
-    //
-    //         // Convert utilities to weights
-    //         let weights: Vec<f64> = utilities.iter().map(|(_, util)| *util).collect();
-    //
-    //         // Create a WeightedIndex distribution
-    //         let dist = WeightedIndex::new(&weights).unwrap();
-    //
-    //         // Sample from it
-    //         let index = dist.sample(&mut rng);
-    //
-    //         // Get the corresponding item
-    //         let ((person_name, item_name), _util) = &utilities[index];
-    //
-    //         info!("Chosen item for person {} is {}", person_name, item_name);
-    //     }
 }
 
 fn calculate_total_items(assets: &Inventory) -> HashMap<ItemType, u64> {
@@ -212,20 +210,18 @@ fn marginal_utility(
     let original_utility = utility(needs, name, total_items, price_history);
     *total_items_copy.entry(item_type.clone()).or_insert(0) += 1;
     let new_utility = utility(needs, name, &total_items_copy, price_history);
-    let result = new_utility - original_utility;
-    // info!("Marginal utility for person {} for {} is {}", name, item_type.name, result);
-    result
+    new_utility - original_utility
 }
 
 fn utility(
     needs: &Res<Needs>,
-    name: &Name,
+    _name: &Name,
     total_items: &HashMap<ItemType, u64>,
-    price_history: &Res<PriceHistory>,
+    _price_history: &Res<PriceHistory>,
 ) -> f64 {
     let mut result = 1.0;
     // calculate utility for each need
-    for (need_name, need) in needs.needs.iter() {
+    for (_, need) in needs.needs.iter() {
         for (item, amount) in need.satisfied_by.iter() {
             let items_count = *total_items
                 .get(&ItemType {

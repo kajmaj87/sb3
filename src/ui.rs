@@ -367,6 +367,7 @@ pub fn render_manufacturers_stats(
             // .resizable(self.resizable)
             .cell_layout(Layout::left_to_right(Align::Center))
             .column(Column::auto())
+            .column(Column::auto())
             .column(Column::initial(80.0).range(80.0..=200.0))
             .column(Column::auto())
             .column(Column::auto())
@@ -380,6 +381,11 @@ pub fn render_manufacturers_stats(
                 header.col(|ui| {
                     if ui.button("Name").clicked() {
                         sort_order.manufacturers = ManufacturerSort::Name;
+                    }
+                });
+                header.col(|ui| {
+                    if ui.button("Produces").clicked() {
+                        sort_order.manufacturers = ManufacturerSort::Production;
                     }
                 });
                 header.col(|ui| {
@@ -425,6 +431,7 @@ pub fn render_manufacturers_stats(
                     .iter()
                     .map(|(entity, name, wallet, manufacturer)| ManufacturerRow {
                         name: name.to_string(),
+                        production: manufacturer.production_cycle.output.0.name.to_string(),
                         money: wallet.money,
                         workers: manufacturer.hired_workers.len(),
                         items: manufacturer
@@ -443,6 +450,9 @@ pub fn render_manufacturers_stats(
                 match sort_order.manufacturers {
                     ManufacturerSort::Name => {
                         rows.sort_by(|a, b| a.name.partial_cmp(&b.name).unwrap())
+                    }
+                    ManufacturerSort::Production => {
+                        rows.sort_by(|a, b| a.production.partial_cmp(&b.production).unwrap())
                     }
                     ManufacturerSort::Money => {
                         rows.sort_by(|a, b| b.money.partial_cmp(&a.money).unwrap())
@@ -468,6 +478,9 @@ pub fn render_manufacturers_stats(
                     body.row(20.0, |mut row| {
                         row.col(|ui| {
                             ui.label(&r.name);
+                        });
+                        row.col(|ui| {
+                            ui.label(&r.production);
                         });
                         row.col(|ui| {
                             ui.label(&r.money.to_string());
@@ -568,7 +581,7 @@ pub fn render_people_stats(
                             ui.label(&r.items.to_string());
                         });
                         row.col(|ui| {
-                            ui.label(&r.utility.log10().to_string());
+                            ui.label(&r.utility.to_string());
                         });
                     });
                 }
@@ -589,6 +602,7 @@ pub enum ManufacturerSort {
     ItemsToSell,
     OnMarket,
     BuyOrders,
+    Production,
 }
 
 pub enum PeopleSort {
@@ -600,6 +614,7 @@ pub enum PeopleSort {
 
 struct ManufacturerRow {
     pub name: String,
+    pub production: String,
     pub money: Money,
     pub workers: usize,
     pub items: usize,
