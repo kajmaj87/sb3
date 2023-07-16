@@ -434,12 +434,8 @@ pub fn render_manufacturers_stats(
                         production: manufacturer.production_cycle.output.0.name.to_string(),
                         money: wallet.money,
                         workers: manufacturer.hired_workers.len(),
-                        items: manufacturer
-                            .assets
-                            .items
-                            .values()
-                            .map(|x| x.len())
-                            .sum::<usize>(),
+                        items: count_items(&manufacturer.assets.items),
+                        items_text: items_to_string(&manufacturer.assets.items),
                         items_to_sell: manufacturer.assets.items_to_sell.len(),
                         on_market: *owner_counts.get(&entity).unwrap_or(&0),
                         buy_orders: *buy_order_by_type
@@ -489,7 +485,10 @@ pub fn render_manufacturers_stats(
                             ui.label(&r.workers.to_string());
                         });
                         row.col(|ui| {
-                            ui.label(&r.items.to_string());
+                            let label = ui.label(&r.items.to_string());
+                            if r.items > 0 {
+                                label.on_hover_text(&r.items_text);
+                            }
                         });
                         row.col(|ui| {
                             ui.label(&r.items_to_sell.to_string());
@@ -552,7 +551,8 @@ pub fn render_people_stats(
                     .map(|(_, name, wallet, person)| PersonRow {
                         name: name.to_string(),
                         money: wallet.money,
-                        items: person.assets.items.len(),
+                        items: count_items(&person.assets.items),
+                        items_text: items_to_string(&person.assets.items),
                         utility: person.utility,
                     })
                     .collect::<Vec<_>>();
@@ -578,7 +578,10 @@ pub fn render_people_stats(
                             ui.label(&r.money.to_string());
                         });
                         row.col(|ui| {
-                            ui.label(&r.items.to_string());
+                            let label = ui.label(&r.items.to_string());
+                            if r.items > 0 {
+                                label.on_hover_text(&r.items_text);
+                            }
                         });
                         row.col(|ui| {
                             ui.label(&r.utility.to_string());
@@ -588,6 +591,20 @@ pub fn render_people_stats(
             });
     });
 }
+
+fn count_items(items: &HashMap<ItemType, Vec<Entity>>) -> usize {
+    items.values().map(|x| x.len()).sum()
+}
+
+fn items_to_string(items: &HashMap<ItemType, Vec<Entity>>) -> String {
+    items
+        .iter()
+        .filter(|(_, items)| !items.is_empty())
+        .map(|(item_type, items)| format!("{}: {}", item_type.name, items.len()))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 #[derive(Resource)]
 pub struct SortOrder {
     pub manufacturers: ManufacturerSort,
@@ -621,6 +638,7 @@ struct ManufacturerRow {
     pub items_to_sell: usize,
     pub on_market: usize,
     buy_orders: usize,
+    items_text: String,
 }
 
 struct PersonRow {
@@ -628,6 +646,7 @@ struct PersonRow {
     pub money: Money,
     items: usize,
     utility: f64,
+    items_text: String,
 }
 
 // pub fn create_histogram(name: &str, values: &[u64], bins: u32) -> BarChart {

@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::SliceRandom;
 use rand::Rng;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
 
 use macros::measured;
@@ -21,13 +21,15 @@ pub struct Names {
 pub struct Need {
     pub base: f64,
     pub preference: f64,
-    pub satisfied_by: HashMap<String, f64>,
-    pub increased_by: Option<HashMap<String, f64>>,
+    #[serde(deserialize_with = "deserialize_item_type_map")]
+    pub satisfied_by: HashMap<ItemType, f64>,
+    #[serde(default, deserialize_with = "deserialize_optional_item_type_map")]
+    pub increased_by: Option<HashMap<ItemType, f64>>,
 }
 
 #[derive(Resource, Default)]
 pub struct Needs {
-    pub needs: HashMap<String, Need>,
+    pub needs: HashMap<ItemType, Need>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -52,7 +54,10 @@ impl Needs {
     pub fn load(&mut self) {
         let needs = std::fs::read_to_string("data/needs.json").unwrap();
         let needs: HashMap<String, Need> = serde_json::from_str(&needs).unwrap();
-        self.needs = needs;
+        self.needs = needs
+            .into_iter()
+            .map(|(k, v)| (ItemType { name: k }, v))
+            .collect();
     }
 }
 
@@ -71,6 +76,34 @@ impl Names {
             unique_names
         );
         info!("Name collision probabilities for n people: 10: {:.3}%, 100: {:.3}%, 1000: {:.3}%, 10000: {:.3}%", collision_probability(10, unique_names), collision_probability(100, unique_names), collision_probability(1000, unique_names), collision_probability(10000, unique_names));
+    }
+}
+
+fn deserialize_item_type_map<'de, D>(deserializer: D) -> Result<HashMap<ItemType, f64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let map: HashMap<String, f64> = HashMap::deserialize(deserializer)?;
+    Ok(map
+        .into_iter()
+        .map(|(k, v)| (ItemType { name: k }, v))
+        .collect())
+}
+
+fn deserialize_optional_item_type_map<'de, D>(
+    deserializer: D,
+) -> Result<Option<HashMap<ItemType, f64>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt_map: Option<HashMap<String, f64>> = Option::deserialize(deserializer)?;
+    match opt_map {
+        Some(map) => Ok(Some(
+            map.into_iter()
+                .map(|(k, v)| (ItemType { name: k }, v))
+                .collect(),
+        )),
+        None => Ok(None),
     }
 }
 
@@ -146,17 +179,14 @@ pub fn create_buy_orders_for_people(
     let mut rng = rand::thread_rng();
     for (buyer, name, _, mut person) in people.iter_mut() {
         let total_assets = calculate_total_items(&person.assets);
-        let mut person_marginal_utilities: HashMap<String, f64> = HashMap::new();
+        let mut person_marginal_utilities: HashMap<ItemType, f64> = HashMap::new();
         for need in needs.needs.iter().flat_map(|(_, n)| n.satisfied_by.keys()) {
-            let item_type = ItemType {
-                name: need.to_string(),
-            };
-            let util = marginal_utility(&needs, name, &total_assets, &price_history, &item_type);
-            person_marginal_utilities.insert(item_type.name.clone(), util);
+            let util = marginal_utility(&needs, name, &total_assets, &price_history, need);
+            person_marginal_utilities.insert(need.clone(), util);
         }
         person.utility = utility(&needs, name, &total_assets, &price_history);
         // Sort by utility
-        let mut utilities: Vec<(&String, &f64)> = person_marginal_utilities.iter().collect();
+        let mut utilities: Vec<(&ItemType, &f64)> = person_marginal_utilities.iter().collect();
         utilities.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap());
 
         // Convert utilities to weights
@@ -169,20 +199,18 @@ pub fn create_buy_orders_for_people(
         let index = dist.sample(&mut rng);
 
         // Get the corresponding item
-        let (item_name, _util) = utilities[index];
+        let (item_type, _util) = utilities[index];
 
-        trace!("Chosen item for person {} is {}", name, item_name);
+        trace!("Chosen item for person {} is {}", name, item_type.name);
         let buy_order = BuyOrder {
-            item_type: ItemType {
-                name: item_name.to_string(),
-            },
+            item_type: item_type.clone(),
             buyer,
             order: OrderType::Market, // Always buying at market price
             expiration: Some(10),
         };
         commands.spawn((
             buy_order.clone(),
-            Name::new(format!("Consumer {} buy order @Market", item_name)),
+            Name::new(format!("Consumer {} buy order @Market", item_type.name)),
         ));
     }
 }
@@ -196,10 +224,10 @@ fn calculate_total_items(assets: &Inventory) -> HashMap<ItemType, u64> {
 }
 
 fn marginal_utility(
-    needs: &Res<Needs>,
+    needs: &Needs,
     name: &Name,
     total_items: &HashMap<ItemType, u64>,
-    price_history: &Res<PriceHistory>,
+    price_history: &PriceHistory,
     item_type: &ItemType,
 ) -> f64 {
     // Create a mutable copy of the total_items HashMap
@@ -214,20 +242,16 @@ fn marginal_utility(
 }
 
 fn utility(
-    needs: &Res<Needs>,
+    needs: &Needs,
     _name: &Name,
     total_items: &HashMap<ItemType, u64>,
-    _price_history: &Res<PriceHistory>,
+    _price_history: &PriceHistory,
 ) -> f64 {
     let mut result = 1.0;
     // calculate utility for each need
     for (_, need) in needs.needs.iter() {
-        for (item, amount) in need.satisfied_by.iter() {
-            let items_count = *total_items
-                .get(&ItemType {
-                    name: item.to_string(),
-                })
-                .unwrap_or(&0);
+        for (item_type, amount) in need.satisfied_by.iter() {
+            let items_count = *total_items.get(item_type).unwrap_or(&0);
             let item_utility =
                 ((items_count as f64 * amount + 1.0) / need.base).powf(need.preference);
             // info!("Utility for person {} for {} is {}", name, item, item_utility);

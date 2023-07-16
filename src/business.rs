@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 
-#[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd)]
+#[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd, Deserialize)]
 pub struct ItemType {
     pub(crate) name: String,
 }
