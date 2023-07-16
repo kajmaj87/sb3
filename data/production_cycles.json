@@ -31,7 +31,7 @@
     "input": {},
     "output": [
       "raw food",
-      10
+      50
     ],
     "workdays_needed": 1
   },
@@ -71,12 +71,12 @@
   {
     "name": "Food Processing",
     "input": {
-      "raw food": 5,
+      "raw food": 10,
       "energy": 1
     },
     "output": [
       "processed food",
-      4
+      16
     ],
     "workdays_needed": 1
   },

@@ -14,7 +14,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -33,7 +33,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -52,7 +52,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -68,7 +68,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -84,7 +84,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -103,7 +103,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -119,7 +119,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -138,7 +138,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -154,7 +154,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -173,7 +173,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -192,7 +192,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -211,7 +211,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -230,7 +230,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -249,7 +249,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -283,7 +283,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -302,7 +302,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -324,7 +324,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -346,7 +346,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -362,7 +362,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -390,7 +390,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   },
@@ -412,7 +412,7 @@
     "sell_strategy": {
       "margin_drop_per_day": 0.1,
       "current_margin": 2.0,
-      "min_margin": 1.1
+      "min_margin": 0.5
     },
     "copies": 1
   }

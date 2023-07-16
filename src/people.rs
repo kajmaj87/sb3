@@ -185,33 +185,90 @@ pub fn create_buy_orders_for_people(
             person_marginal_utilities.insert(need.clone(), util);
         }
         person.utility = utility(&needs, name, &total_assets, &price_history);
-        // Sort by utility
-        let mut utilities: Vec<(&ItemType, &f64)> = person_marginal_utilities.iter().collect();
-        utilities.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap());
+        if let Some(money_utility) =
+            calculate_money_utility(&person_marginal_utilities, &price_history)
+        {
+            info!("Money utility for {} is {}", name, money_utility);
+            let utilities_with_prices = calculate_marginal_utilities_adjusted_by_prices(
+                &person_marginal_utilities,
+                &price_history,
+                money_utility,
+            );
+            // info!("Utilities without prices for {} are:\n {:#?}", name, person_marginal_utilities);
+            info!(
+                "Utilities with prices for {} are:\n {:#?}",
+                name, utilities_with_prices
+            );
+            // Sort by utility
+            let mut utilities: Vec<(&ItemType, &f64)> = utilities_with_prices.iter().collect();
+            utilities.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap());
 
-        // Convert utilities to weights
-        let weights: Vec<f64> = utilities.iter().map(|(_, util)| **util).collect();
+            // Convert utilities to weights
+            let weights: Vec<f64> = utilities.iter().map(|(_, util)| **util).collect();
 
-        // Create a WeightedIndex distribution
-        let dist = WeightedIndex::new(&weights).unwrap();
+            // Create a WeightedIndex distribution
+            let dist = WeightedIndex::new(&weights).unwrap();
 
-        // Sample from it
-        let index = dist.sample(&mut rng);
+            // Sample from it
+            let index = dist.sample(&mut rng);
 
-        // Get the corresponding item
-        let (item_type, _util) = utilities[index];
+            // Get the corresponding item
+            let (item_type, _util) = utilities[index];
 
-        trace!("Chosen item for person {} is {}", name, item_type.name);
-        let buy_order = BuyOrder {
-            item_type: item_type.clone(),
-            buyer,
-            order: OrderType::Market, // Always buying at market price
-            expiration: Some(10),
-        };
-        commands.spawn((
-            buy_order.clone(),
-            Name::new(format!("Consumer {} buy order @Market", item_type.name)),
-        ));
+            trace!("Chosen item for person {} is {}", name, item_type.name);
+            let buy_order = BuyOrder {
+                item_type: item_type.clone(),
+                buyer,
+                order: OrderType::Market, // Always buying at market price
+                expiration: Some(10),
+            };
+            commands.spawn((
+                buy_order.clone(),
+                Name::new(format!("Consumer {} buy order @Market", item_type.name)),
+            ));
+        }
+    }
+}
+
+fn calculate_marginal_utilities_adjusted_by_prices(
+    item_utilities: &HashMap<ItemType, f64>,
+    price_history: &Res<PriceHistory>,
+    money_utility: f64,
+) -> HashMap<ItemType, f64> {
+    let mut result = HashMap::new();
+    for (item_type, item_utility) in item_utilities.iter() {
+        if let Some(price_stats) = price_history.prices.get(item_type) {
+            if let Some(last_price) = price_stats.last() {
+                let updated_utility = item_utility - last_price.median as f64 * money_utility;
+                if updated_utility > 0.0 {
+                    result.insert(item_type.clone(), updated_utility);
+                }
+            }
+        }
+    }
+    result
+}
+
+fn calculate_money_utility(
+    item_utilities: &HashMap<ItemType, f64>,
+    price_history: &Res<PriceHistory>,
+) -> Option<f64> {
+    let mut total_utility = 0.0;
+    let mut price_count = 0;
+
+    for (item_type, item_utility) in item_utilities.iter() {
+        if let Some(price_stats) = price_history.prices.get(item_type) {
+            if let Some(last_price) = price_stats.last() {
+                total_utility += *item_utility / last_price.median as f64;
+                price_count += 1;
+            }
+        }
+    }
+
+    if price_count > 0 {
+        Some(total_utility / price_count as f64)
+    } else {
+        None
     }
 }
 

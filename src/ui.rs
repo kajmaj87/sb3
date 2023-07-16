@@ -354,6 +354,7 @@ pub fn render_manufacturers_stats(
     manufacturers: Query<(Entity, &Name, &Wallet, &Manufacturer)>,
     sell_orders: Query<&SellOrder>,
     buy_orders: Query<&BuyOrder>,
+    names: Query<&Name>,
     mut sort_order: ResMut<SortOrder>,
 ) {
     Window::new("Manufacturers").show(egui_context.ctx_mut(), |ui| {
@@ -427,6 +428,18 @@ pub fn render_manufacturers_stats(
                         *acc.entry(x).or_insert(0) += 1;
                         acc
                     });
+                let buy_order_by_type_and_buyer: HashMap<(ItemType, Name), usize> = buy_orders
+                    .iter()
+                    .map(|x| (x.item_type.clone(), names.get(x.buyer).unwrap().clone()))
+                    .fold(HashMap::new(), |mut acc, x| {
+                        *acc.entry(x).or_insert(0) += 1;
+                        acc
+                    });
+                let mut buy_order_vec: Vec<((ItemType, Name), usize)> =
+                    buy_order_by_type_and_buyer.into_iter().collect();
+                buy_order_vec.sort_by(|((_, a_name), a), ((_, b_name), b)| {
+                    b.cmp(a).then_with(|| a_name.cmp(b_name))
+                });
                 let mut rows = manufacturers
                     .iter()
                     .map(|(entity, name, wallet, manufacturer)| ManufacturerRow {
@@ -441,6 +454,12 @@ pub fn render_manufacturers_stats(
                         buy_orders: *buy_order_by_type
                             .get(&manufacturer.production_cycle.output.0)
                             .unwrap_or(&0),
+                        buy_orders_text: buy_order_vec
+                            .iter()
+                            .filter(|x| x.0 .0 == manufacturer.production_cycle.output.0)
+                            .map(|x| format!("{}: {}", x.0 .1, x.1))
+                            .collect::<Vec<_>>()
+                            .join("\n"),
                     })
                     .collect::<Vec<_>>();
                 match sort_order.manufacturers {
@@ -497,7 +516,10 @@ pub fn render_manufacturers_stats(
                             ui.label(&r.on_market.to_string());
                         });
                         row.col(|ui| {
-                            ui.label(&r.buy_orders.to_string());
+                            let label = ui.label(&r.buy_orders.to_string());
+                            if r.buy_orders > 0 {
+                                label.on_hover_text(&r.buy_orders_text);
+                            }
                         });
                     });
                 }
@@ -639,6 +661,7 @@ struct ManufacturerRow {
     pub on_market: usize,
     buy_orders: usize,
     items_text: String,
+    buy_orders_text: String,
 }
 
 struct PersonRow {
