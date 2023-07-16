@@ -12,7 +12,7 @@ use bevy_egui::egui::plot::{
     BoxElem, BoxPlot, BoxSpread, Legend, Line, LineStyle, Plot, PlotPoints,
 };
 use bevy_egui::egui::{
-    Align, Button, Color32, Hyperlink, Layout, SidePanel, TopBottomPanel, Widget, Window,
+    Align, Button, Color32, Hyperlink, Layout, SidePanel, TopBottomPanel, Ui, Widget, Window,
 };
 use bevy_egui::{egui, EguiContexts};
 use egui_extras::{Column, TableBuilder};
@@ -310,9 +310,9 @@ pub fn render_price_history(history: Res<PriceHistory>, mut egui_context: EguiCo
                 let p75 = prices.p75;
                 let avg = prices.avg;
                 let day = prices.day;
-                avgs.push([day as f64, avg as f64]);
-                p25s.push([day as f64, p25 as f64]);
-                p75s.push([day as f64, p75 as f64]);
+                avgs.push([day as f64, avg.as_f64()]);
+                p25s.push([day as f64, p25.as_f64()]);
+                p75s.push([day as f64, p75.as_f64()]);
             }
             line_avg.insert(item_type.clone(), avgs);
             line_p25.insert(item_type.clone(), p25s);
@@ -348,6 +348,7 @@ pub fn render_price_history(history: Res<PriceHistory>, mut egui_context: EguiCo
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 #[measured]
 pub fn render_manufacturers_stats(
     mut egui_context: EguiContexts,
@@ -356,6 +357,7 @@ pub fn render_manufacturers_stats(
     buy_orders: Query<&BuyOrder>,
     names: Query<&Name>,
     mut sort_order: ResMut<SortOrder>,
+    price_history: Res<PriceHistory>,
 ) {
     Window::new("Manufacturers").show(egui_context.ctx_mut(), |ui| {
         let mut owner_counts: HashMap<Entity, usize> = HashMap::new();
@@ -445,12 +447,21 @@ pub fn render_manufacturers_stats(
                     .map(|(entity, name, wallet, manufacturer)| ManufacturerRow {
                         name: name.to_string(),
                         production: manufacturer.production_cycle.output.0.name.to_string(),
+                        production_text: format!("{}", manufacturer.production_cycle),
                         money: wallet.money,
                         workers: manufacturer.hired_workers.len(),
                         items: count_items(&manufacturer.assets.items),
                         items_text: items_to_string(&manufacturer.assets.items),
                         items_to_sell: manufacturer.assets.items_to_sell.len(),
                         on_market: *owner_counts.get(&entity).unwrap_or(&0),
+                        on_market_text: price_history
+                            .prices
+                            .get(&manufacturer.production_cycle.output.0)
+                            .and_then(|x| x.last())
+                            .map_or_else(
+                                || "".to_string(),
+                                |price_stats| format!("{}", price_stats),
+                            ),
                         buy_orders: *buy_order_by_type
                             .get(&manufacturer.production_cycle.output.0)
                             .unwrap_or(&0),
@@ -495,7 +506,7 @@ pub fn render_manufacturers_stats(
                             ui.label(&r.name);
                         });
                         row.col(|ui| {
-                            ui.label(&r.production);
+                            ui.label(&r.production).on_hover_text(&r.production_text);
                         });
                         row.col(|ui| {
                             ui.label(&r.money.to_string());
@@ -504,27 +515,28 @@ pub fn render_manufacturers_stats(
                             ui.label(&r.workers.to_string());
                         });
                         row.col(|ui| {
-                            let label = ui.label(&r.items.to_string());
-                            if r.items > 0 {
-                                label.on_hover_text(&r.items_text);
-                            }
+                            label_with_hover_text(ui, r.items, &r.items_text);
                         });
                         row.col(|ui| {
                             ui.label(&r.items_to_sell.to_string());
                         });
                         row.col(|ui| {
-                            ui.label(&r.on_market.to_string());
+                            label_with_hover_text(ui, r.on_market, &r.on_market_text);
                         });
                         row.col(|ui| {
-                            let label = ui.label(&r.buy_orders.to_string());
-                            if r.buy_orders > 0 {
-                                label.on_hover_text(&r.buy_orders_text);
-                            }
+                            label_with_hover_text(ui, r.buy_orders, &r.buy_orders_text);
                         });
                     });
                 }
             });
     });
+}
+
+fn label_with_hover_text(ui: &mut Ui, amount: usize, hover_text: &str) {
+    let label = ui.label(amount.to_string());
+    if amount > 0 {
+        label.on_hover_text(hover_text);
+    }
 }
 
 #[measured]
@@ -600,10 +612,7 @@ pub fn render_people_stats(
                             ui.label(&r.money.to_string());
                         });
                         row.col(|ui| {
-                            let label = ui.label(&r.items.to_string());
-                            if r.items > 0 {
-                                label.on_hover_text(&r.items_text);
-                            }
+                            label_with_hover_text(ui, r.items, &r.items_text);
                         });
                         row.col(|ui| {
                             ui.label(&r.utility.to_string());
@@ -659,9 +668,11 @@ struct ManufacturerRow {
     pub items: usize,
     pub items_to_sell: usize,
     pub on_market: usize,
+    on_market_text: String,
     buy_orders: usize,
     items_text: String,
     buy_orders_text: String,
+    production_text: String,
 }
 
 struct PersonRow {

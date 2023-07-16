@@ -111,6 +111,9 @@ impl Money {
     pub fn as_u64(&self) -> u64 {
         self.0
     }
+    pub fn as_f64(&self) -> f64 {
+        self.0 as f64
+    }
 }
 
 impl FromStr for Money {

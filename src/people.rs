@@ -239,7 +239,7 @@ fn calculate_marginal_utilities_adjusted_by_prices(
     for (item_type, item_utility) in item_utilities.iter() {
         if let Some(price_stats) = price_history.prices.get(item_type) {
             if let Some(last_price) = price_stats.last() {
-                let updated_utility = item_utility - last_price.median as f64 * money_utility;
+                let updated_utility = item_utility - last_price.median.as_f64() * money_utility;
                 if updated_utility > 0.0 {
                     result.insert(item_type.clone(), updated_utility);
                 }
@@ -259,7 +259,7 @@ fn calculate_money_utility(
     for (item_type, item_utility) in item_utilities.iter() {
         if let Some(price_stats) = price_history.prices.get(item_type) {
             if let Some(last_price) = price_stats.last() {
-                total_utility += *item_utility / last_price.median as f64;
+                total_utility += *item_utility / last_price.median.as_f64();
                 price_count += 1;
             }
         }

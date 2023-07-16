@@ -8,6 +8,7 @@ use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use std::fmt;
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd, Deserialize)]
 pub struct ItemType {
@@ -20,6 +21,19 @@ pub struct ProductionCycle {
     pub output: (ItemType, u32),
     // tools: HashMap<ItemType, u32>,
     pub workdays_needed: u32,
+}
+
+impl fmt::Display for ProductionCycle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Production Cycle:\n")?;
+        writeln!(f, "Input:")?;
+        for (item_type, count) in &self.input {
+            writeln!(f, "  - {}: {}", item_type.name, count)?;
+        }
+        writeln!(f, "Output:")?;
+        writeln!(f, "  - {}: {}\n", self.output.0.name, self.output.1)?;
+        writeln!(f, "Workdays: {}", self.workdays_needed)
+    }
 }
 
 #[derive(Debug, Default)]

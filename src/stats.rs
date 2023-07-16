@@ -3,18 +3,33 @@ use crate::money::Money;
 use crate::Days;
 use bevy::prelude::{debug, Query, Res, ResMut, Resource};
 use std::collections::{BTreeMap, HashMap};
+use std::fmt;
 
 #[derive(Debug)]
 pub struct PriceStats {
     pub item_type: ItemType,
-    pub min: u64,
-    pub max: u64,
-    pub median: u64,
-    pub p25: u64,
-    pub p75: u64,
-    pub avg: u64,
+    pub min: Money,
+    pub max: Money,
+    pub median: Money,
+    pub p25: Money,
+    pub p75: Money,
+    pub avg: Money,
     pub total_orders: usize,
     pub day: usize,
+}
+
+impl fmt::Display for PriceStats {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "Price for {}: {}\n", self.item_type.name, self.avg)?;
+        writeln!(f, "📉  MIN Price: {}", self.min)?;
+        writeln!(f, "🔳  25th Percentile Price: {}", self.p25)?;
+        writeln!(f, "🎯  MEDIAN Price: {}", self.median)?;
+        writeln!(f, "🔳  75th Percentile Price: {}", self.p75)?;
+        writeln!(f, "📈  MAX Price: {}", self.max)?;
+        writeln!(f, "🔵  AVERAGE Price: {}", self.avg)?;
+        writeln!(f, "📊  Total Orders: {}", self.total_orders)?;
+        writeln!(f, "🗓  Day: {}", self.day)
+    }
 }
 
 #[derive(Resource, Default)]
@@ -40,13 +55,13 @@ pub fn add_sell_orders_to_history(
         let mut prices = sell_order.iter().map(|o| o.price).collect::<Vec<_>>();
         prices.sort_unstable();
 
-        let min = prices.first().unwrap().as_u64();
-        let max = prices.last().unwrap().as_u64();
-        let median = prices[prices.len() / 2].as_u64();
-        let p25 = prices[(prices.len() as f32 * 0.25).floor() as usize].as_u64();
-        let p75 = prices[(prices.len() as f32 * 0.75).floor() as usize].as_u64();
+        let min = *prices.first().unwrap();
+        let max = *prices.last().unwrap();
+        let median = prices[prices.len() / 2];
+        let p25 = prices[(prices.len() as f32 * 0.25).floor() as usize];
+        let p75 = prices[(prices.len() as f32 * 0.75).floor() as usize];
         let len = prices.len();
-        let avg = (prices.iter().sum::<Money>() / len).as_u64();
+        let avg = prices.iter().sum::<Money>() / len;
 
         let stats = PriceStats {
             item_type: item_type.clone(),
