@@ -1,0 +1,38 @@
+{
+  "food": {
+    "base": 50,
+    "preference": 0.6,
+    "satisfied_by": {
+      "processed food": 10,
+      "raw food": 2,
+      "Hydroponic HomeKit": 20
+    }
+  },
+  "clothing": {
+    "base": 10,
+    "preference": 0.45,
+    "satisfied_by": {
+      "FutureWear": 10
+    }
+  },
+  "energy": {
+    "base": 20,
+    "preference": 0.3,
+    "satisfied_by": {
+      "energy": 1
+    },
+    "increased_by": {
+      "Hydroponic HomeKit": 2,
+      "SmartHome installation": 5
+    }
+  },
+  "luxury": {
+    "base": 10,
+    "preference": 0.1,
+    "satisfied_by": {
+      "Hydroponic HomeKit": 20,
+      "SmartHome installation": 50,
+      "Luxury Space Cruise Ticket": 1000
+    }
+  }
+}

@@ -45,6 +45,8 @@ fn main() {
         .insert_resource(stats::PriceHistory::default())
         .insert_resource(init::Templates::default())
         .insert_resource(people::Names::default())
+        .insert_resource(people::Needs::default())
+        .insert_resource(people::Items::default())
         .insert_resource(info)
         .insert_resource(debug_ui::Performance::new(100))
         .insert_resource(ui::SortOrder {
@@ -52,18 +54,22 @@ fn main() {
             people: PeopleSort::Name,
         })
         .add_event::<commands::GameCommand>()
-        .add_systems(Startup, (init::init_names, init::init_manufacturers))
+        .add_systems(Startup, (init::init_people, init::init_manufacturers))
         .add_systems(First, user_input::input_system)
         .add_systems(PreUpdate, date_update_system.run_if(should_advance_day))
         .add_systems(
             Update,
             (
                 // those system run in sequence
+                business::order_expiration,
                 business::salary_payout,
-                business::execute_orders_for_manufacturers,
+                business::execute_orders,
+                business::process_transactions,
                 business::produce,
                 (business::create_buy_orders, business::create_sell_orders), // those run in parallel
                 business::update_sell_order_prices,
+                people::consume,
+                people::create_buy_orders_for_people,
                 stats::add_sell_orders_to_history,
             )
                 .chain()

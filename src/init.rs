@@ -1,12 +1,12 @@
 use crate::business::{
     BuyStrategy, Inventory, ItemType, Manufacturer, ManufacturerBundle, ProductionCycle,
-    SellStrategy, Wallet, Worker,
+    SellStrategy, TransactionLog, Wallet, Worker,
 };
 use crate::money::money_from_str_or_num;
 use crate::money::Money;
 use crate::people;
-use crate::people::Names;
-use crate::people::Person;
+use crate::people::{Items, Person};
+use crate::people::{Names, Needs};
 use bevy::core::Name;
 use bevy::log::info;
 use bevy::prelude::*;
@@ -185,7 +185,8 @@ impl ManufacturerTemplate {
                         .spawn((
                             *w,
                             Wallet { money: Money(0) },
-                            Person {},
+                            Person::default(),
+                            TransactionLog::default(),
                             Name::new(people::generate_name(names)),
                         ))
                         .id()
@@ -207,6 +208,7 @@ impl ManufacturerTemplate {
                     money: self.money,
                 },
                 sell_strategy: self.sell_strategy,
+                transaction_log: TransactionLog::default(),
             };
             manufacturers.push(manufacturer);
         }
@@ -252,8 +254,10 @@ impl ProductionCycleTemplate {
     }
 }
 
-pub fn init_names(mut names: ResMut<Names>) {
+pub fn init_people(mut names: ResMut<Names>, mut needs: ResMut<Needs>, mut items: ResMut<Items>) {
     names.load();
+    needs.load();
+    items.load();
 }
 
 pub fn init_manufacturers(
