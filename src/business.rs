@@ -66,7 +66,7 @@ pub struct Manufacturer {
 #[derive(Component, Debug, Serialize, Deserialize, Copy, Clone)]
 pub struct Worker {
     pub(crate) salary: Money,
-    // employer: Entity,
+    pub(crate) employed_at: Option<Entity>,
 }
 
 #[derive(Component, Debug)]

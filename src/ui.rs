@@ -1,4 +1,4 @@
-use crate::business::{BuyOrder, ItemType, Manufacturer, SellOrder, Wallet};
+use crate::business::{BuyOrder, ItemType, Manufacturer, SellOrder, Wallet, Worker};
 use crate::commands::GameCommand;
 use crate::debug_ui::Performance;
 use crate::init::{ManufacturerTemplate, ProductionCycleTemplate, TemplateType, Templates};
@@ -356,6 +356,7 @@ pub fn render_manufacturers_stats(
     sell_orders: Query<&SellOrder>,
     buy_orders: Query<&BuyOrder>,
     names: Query<&Name>,
+    workers: Query<&Worker>,
     mut sort_order: ResMut<SortOrder>,
     price_history: Res<PriceHistory>,
 ) {
@@ -453,7 +454,13 @@ pub fn render_manufacturers_stats(
                         workers_text: manufacturer
                             .hired_workers
                             .iter()
-                            .map(|x| format!("{}", names.get(*x).unwrap()))
+                            .map(|x| {
+                                format!(
+                                    "{} ({})",
+                                    names.get(*x).unwrap(),
+                                    workers.get(*x).unwrap().salary
+                                )
+                            })
                             .collect::<Vec<String>>()
                             .join("\n"),
                         items: count_items(&manufacturer.assets.items),
@@ -553,6 +560,8 @@ fn label_with_hover_text(ui: &mut Ui, amount: usize, hover_text: &str) {
 pub fn render_people_stats(
     mut egui_context: EguiContexts,
     people: Query<(Entity, &Name, &Wallet, &Person)>,
+    workers: Query<&Worker>,
+    manufacturers: Query<(Entity, &Name, &Manufacturer)>,
     mut sort_order: ResMut<SortOrder>,
 ) {
     Window::new("People").show(egui_context.ctx_mut(), |ui| {
@@ -563,7 +572,9 @@ pub fn render_people_stats(
             .column(Column::auto())
             .column(Column::auto())
             .column(Column::auto())
-            .column(Column::initial(80.0).range(80.0..=200.0))
+            .column(Column::auto())
+            .column(Column::auto())
+            .column(Column::auto())
             .min_scrolled_height(0.0);
 
         table
@@ -588,16 +599,39 @@ pub fn render_people_stats(
                         sort_order.people = PeopleSort::Utility;
                     }
                 });
+                header.col(|ui| {
+                    if ui.button("Employer").clicked() {
+                        sort_order.people = PeopleSort::Employer;
+                    }
+                });
+                header.col(|ui| {
+                    if ui.button("Salary").clicked() {
+                        sort_order.people = PeopleSort::Salary;
+                    }
+                });
             })
             .body(|mut body| {
                 let mut rows = people
                     .iter()
-                    .map(|(_, name, wallet, person)| PersonRow {
+                    .map(|(entity, name, wallet, person)| PersonRow {
                         name: name.to_string(),
                         money: wallet.money,
                         items: count_items(&person.assets.items),
                         items_text: items_to_string(&person.assets.items),
                         utility: person.utility,
+                        employed_at: workers
+                            .get(entity)
+                            .and_then(|w| {
+                                if let Some(employer) = w.employed_at {
+                                    manufacturers
+                                        .get(employer)
+                                        .map(|(_, name, _)| name.to_string())
+                                } else {
+                                    Ok("not yet filled".to_string())
+                                }
+                            })
+                            .unwrap_or_else(|_| "not yet filled".to_string()),
+                        salary: workers.get(entity).map(|w| w.salary).unwrap_or(Money(0)),
                     })
                     .collect::<Vec<_>>();
                 match sort_order.people {
@@ -610,6 +644,12 @@ pub fn render_people_stats(
                     }
                     PeopleSort::Utility => {
                         rows.sort_by(|a, b| b.utility.partial_cmp(&a.utility).unwrap())
+                    }
+                    PeopleSort::Employer => {
+                        rows.sort_by(|a, b| a.employed_at.partial_cmp(&b.employed_at).unwrap())
+                    }
+                    PeopleSort::Salary => {
+                        rows.sort_by(|a, b| b.salary.partial_cmp(&a.salary).unwrap())
                     }
                 }
 
@@ -626,6 +666,12 @@ pub fn render_people_stats(
                         });
                         row.col(|ui| {
                             ui.label(&r.utility.to_string());
+                        });
+                        row.col(|ui| {
+                            ui.label(&r.employed_at);
+                        });
+                        row.col(|ui| {
+                            ui.label(&r.salary.to_string());
                         });
                     });
                 }
@@ -668,6 +714,8 @@ pub enum PeopleSort {
     Money,
     Items,
     Utility,
+    Employer,
+    Salary,
 }
 
 struct ManufacturerRow {
@@ -692,6 +740,8 @@ struct PersonRow {
     items: usize,
     utility: f64,
     items_text: String,
+    employed_at: String,
+    salary: Money,
 }
 
 // pub fn create_histogram(name: &str, values: &[u64], bins: u32) -> BarChart {
