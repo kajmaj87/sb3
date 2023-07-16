@@ -450,6 +450,12 @@ pub fn render_manufacturers_stats(
                         production_text: format!("{}", manufacturer.production_cycle),
                         money: wallet.money,
                         workers: manufacturer.hired_workers.len(),
+                        workers_text: manufacturer
+                            .hired_workers
+                            .iter()
+                            .map(|x| format!("{}", names.get(*x).unwrap()))
+                            .collect::<Vec<String>>()
+                            .join("\n"),
                         items: count_items(&manufacturer.assets.items),
                         items_text: items_to_string(&manufacturer.assets.items),
                         items_to_sell: manufacturer.assets.items_to_sell.len(),
@@ -512,7 +518,7 @@ pub fn render_manufacturers_stats(
                             ui.label(&r.money.to_string());
                         });
                         row.col(|ui| {
-                            ui.label(&r.workers.to_string());
+                            label_with_hover_text(ui, r.workers, &r.workers_text);
                         });
                         row.col(|ui| {
                             label_with_hover_text(ui, r.items, &r.items_text);
@@ -521,7 +527,11 @@ pub fn render_manufacturers_stats(
                             ui.label(&r.items_to_sell.to_string());
                         });
                         row.col(|ui| {
-                            label_with_hover_text(ui, r.on_market, &r.on_market_text);
+                            if r.on_market_text.is_empty() {
+                                label_with_hover_text(ui, r.on_market, "No price history yet");
+                            } else {
+                                label_with_hover_text(ui, r.on_market, &r.on_market_text);
+                            }
                         });
                         row.col(|ui| {
                             label_with_hover_text(ui, r.buy_orders, &r.buy_orders_text);
@@ -673,6 +683,7 @@ struct ManufacturerRow {
     items_text: String,
     buy_orders_text: String,
     production_text: String,
+    workers_text: String,
 }
 
 struct PersonRow {

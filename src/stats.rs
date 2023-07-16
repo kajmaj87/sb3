@@ -28,7 +28,7 @@ impl fmt::Display for PriceStats {
         writeln!(f, "📈  MAX Price: {}", self.max)?;
         writeln!(f, "🔵  AVERAGE Price: {}", self.avg)?;
         writeln!(f, "📊  Total Orders: {}", self.total_orders)?;
-        writeln!(f, "🗓  Day: {}", self.day)
+        write!(f, "🗓  Day: {}", self.day)
     }
 }
 

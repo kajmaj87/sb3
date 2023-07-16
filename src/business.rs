@@ -32,7 +32,7 @@ impl fmt::Display for ProductionCycle {
         }
         writeln!(f, "Output:")?;
         writeln!(f, "  - {}: {}\n", self.output.0.name, self.output.1)?;
-        writeln!(f, "Workdays: {}", self.workdays_needed)
+        write!(f, "Workdays: {}", self.workdays_needed)
     }
 }
 
