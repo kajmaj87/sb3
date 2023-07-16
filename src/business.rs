@@ -20,7 +20,7 @@ pub struct ProductionCycle {
     pub workdays_needed: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Inventory {
     pub(crate) items: HashMap<ItemType, Vec<Entity>>,
     pub(crate) items_to_sell: HashSet<Entity>,
@@ -64,7 +64,7 @@ pub struct Item {
 pub struct SellOrder {
     item: Entity,
     pub(crate) item_type: ItemType,
-    pub(crate) owner: Entity,
+    pub(crate) seller: Entity,
     pub(crate) price: Money,
     pub(crate) base_price: Money,
 }
@@ -106,16 +106,17 @@ pub struct SellStrategy {
 }
 
 #[derive(Debug, Clone)]
-enum OrderType {
+pub enum OrderType {
     Market,
     // Limit(u64),
 }
 
 #[derive(Component, Debug, Clone)]
 pub struct BuyOrder {
-    item_type: ItemType,
-    owner: Entity,
-    order: OrderType,
+    pub(crate) item_type: ItemType,
+    pub(crate) buyer: Entity,
+    pub(crate) order: OrderType,
+    pub(crate) expiration: Option<u64>,
 }
 
 #[derive(Component, Clone)]
@@ -287,7 +288,7 @@ pub fn create_sell_orders(
                 let sell_order = SellOrder {
                     item,
                     item_type: item_cost.item_type.clone(),
-                    owner: seller,
+                    seller: seller,
                     price: item_cost.production_cost
                         * strategy.current_margin.max(strategy.min_margin),
                     base_price: item_cost.production_cost,
@@ -382,7 +383,8 @@ pub fn create_buy_orders(
 
                 let buy_order = BuyOrder {
                     item_type: material.clone(), // assuming ItemType implements Copy
-                    owner: buyer,
+                    buyer,
+                    expiration: None,
                     order: OrderType::Market, // Always buying at market price
                 };
 
@@ -505,7 +507,7 @@ fn execute_order(
     assert_eq!(buy_item_type, sell_item_type);
 
     // Phase 1: Do all the checks and computations
-    if let Ok((_, name, wallet, _)) = manufacturers.get_mut(buy_order.owner) {
+    if let Ok((_, name, wallet, _)) = manufacturers.get_mut(buy_order.buyer) {
         if wallet.money < sell_order.price {
             debug!(
                 "{}: Cannot execute the order: buyer does not have enough money",
@@ -522,11 +524,11 @@ fn execute_order(
 
     // Phase 2: Execute the operations
     if let Ok((_, name, mut wallet, mut buyer_manufacturer)) =
-        manufacturers.get_mut(buy_order.owner)
+        manufacturers.get_mut(buy_order.buyer)
     {
         // Transfer money from buyer to seller
         wallet.money -= sell_order.price;
-        if let Ok((_, mut strategy)) = buy_strategy.get_mut(buy_order.owner) {
+        if let Ok((_, mut strategy)) = buy_strategy.get_mut(buy_order.buyer) {
             *strategy
                 .outstanding_orders
                 .get_mut(&buy_order.item_type)
@@ -550,7 +552,7 @@ fn execute_order(
         );
     }
     if let Ok((_, name, mut wallet, mut seller_manufacturer)) =
-        manufacturers.get_mut(sell_order.owner)
+        manufacturers.get_mut(sell_order.seller)
     {
         // Add money to seller
         wallet.money += sell_order.price;
@@ -582,6 +584,19 @@ pub fn salary_payout(
                     worker_wallet.money += worker.salary;
                     manufacturer_wallet.money -= worker.salary;
                 }
+            }
+        }
+    }
+}
+
+pub fn order_expiration(mut buy_orders: Query<(Entity, &mut BuyOrder)>, mut commands: Commands) {
+    for (buy_order_id, mut buy_order) in buy_orders.iter_mut() {
+        if let Some(expiration) = buy_order.expiration {
+            if expiration == 0 {
+                info!("Order expired: {:?}", buy_order);
+                commands.entity(buy_order_id).despawn();
+            } else {
+                buy_order.expiration = Some(expiration - 1);
             }
         }
     }

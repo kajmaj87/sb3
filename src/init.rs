@@ -5,8 +5,8 @@ use crate::business::{
 use crate::money::money_from_str_or_num;
 use crate::money::Money;
 use crate::people;
-use crate::people::Names;
 use crate::people::Person;
+use crate::people::{Names, Needs};
 use bevy::core::Name;
 use bevy::log::info;
 use bevy::prelude::*;
@@ -185,7 +185,7 @@ impl ManufacturerTemplate {
                         .spawn((
                             *w,
                             Wallet { money: Money(0) },
-                            Person {},
+                            Person::default(),
                             Name::new(people::generate_name(names)),
                         ))
                         .id()
@@ -252,8 +252,9 @@ impl ProductionCycleTemplate {
     }
 }
 
-pub fn init_names(mut names: ResMut<Names>) {
+pub fn init_people(mut names: ResMut<Names>, mut needs: ResMut<Needs>) {
     names.load();
+    needs.load();
 }
 
 pub fn init_manufacturers(
