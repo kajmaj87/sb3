@@ -2,7 +2,7 @@ use crate::business::{BuyOrder, ItemType, Manufacturer, SellOrder, Wallet, Worke
 use crate::commands::GameCommand;
 use crate::debug_ui::Performance;
 use crate::init::{ManufacturerTemplate, ProductionCycleTemplate, TemplateType, Templates};
-use crate::logs::{Logs, Pinned};
+use crate::logs::{LogEntry, Logs, Pinned};
 use crate::money::Money;
 use crate::people::Person;
 use crate::stats::PriceHistory;
@@ -23,6 +23,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, HashMap};
 use std::hash::{Hash, Hasher};
 use std::process::Command;
+use syntect::parsing::Regex;
 
 #[measured]
 pub fn render_template_editor(mut egui_context: EguiContexts, mut templates: ResMut<Templates>) {
@@ -122,18 +123,59 @@ pub fn render_logs(
     mut ui_state: ResMut<UiState>,
 ) {
     Window::new("Logs").show(egui_context.ctx_mut(), |ui| {
-        TextEdit::singleline(&mut ui_state.logging_filter)
-            .desired_width(f32::INFINITY)
-            .show(ui);
+        ui.horizontal(|ui| {
+            let hint = if ui_state.logging_case_sensitive && !ui_state.logging_regex && !ui_state.logging_fuzzy {
+                "type in something to search (CASE SENSITIVE):"
+            } else if ui_state.logging_regex && ui_state.logging_fuzzy {
+                "regex + fuzzy:"
+            } else if ui_state.logging_regex {
+                "regex:"
+            } else if ui_state.logging_fuzzy {
+                "fuzzy:"
+            } else {
+                "type in something to search (case insensitve):"
+            };
+
+            ui.label("Filter:");
+            ui.add(
+                TextEdit::singleline(&mut ui_state.logging_filter)
+                    .desired_width(200.0)
+                    .hint_text(hint),
+            );
+            if ui.button("uU").clicked() {
+                ui_state.logging_case_sensitive = !ui_state.logging_case_sensitive;
+            }
+            if ui.button("R").clicked() {
+                ui_state.logging_regex = !ui_state.logging_regex;
+            }
+            if ui.button("F").clicked() {
+                ui_state.logging_fuzzy = !ui_state.logging_fuzzy;
+            }
+        });
+        if ui_state.regex_error.is_some() {
+            ui.label(format!("Regex error: {}", ui_state.regex_error.as_ref().unwrap()));
+        }
+        ui.collapsing("Instructions", |ui| {
+            ui.label("Click on a 'P' button in other windows to pin entites. Only pinned entities will be shown here. Click 'U' button to unpin entities. Clicking on 'Pin' column header will list only pinned entities without changing sorting selected");
+            ui.label("Default filtering is case insensitive substring search. Small buttons affect the search mode:");
+            ui.label("Click on 'uU' button to enable case sensitive filtering. It does not have any effect if regex is chosen");
+            ui.horizontal(|ui| {
+                ui.label("Click on 'R' button to enable regex filtering. To learn more about regex visit: ");
+                let link = Hyperlink::from_label_and_url(
+                    "here",
+                    "https://regexr.com/",
+                );
+                link.ui(ui);
+                let link = Hyperlink::from_label_and_url(
+                    " or here",
+                    "https://regexone.com/",
+                );
+                link.ui(ui);
+            });
+            ui.label("Click on 'F' button to enable fuzzy filtering.")
+        });
         egui::ScrollArea::vertical().show(ui, |ui| {
-            let shown_logs = logs
-                .entries
-                .iter()
-                .filter(|log| {
-                    pins.get(log.entry.entity).is_ok()
-                        && log.entry.text.contains(&ui_state.logging_filter)
-                })
-                .collect::<Vec<_>>();
+            let shown_logs = filter_logs(&logs.entries, &mut ui_state, pins);
             let mut log_text = shown_logs
                 .iter()
                 .map(|log| format!("Day: {} | {}", log.day, log.entry.text.as_str()))
@@ -147,6 +189,38 @@ pub fn render_logs(
                 .show(ui);
         });
     });
+}
+
+fn filter_logs<'a>(
+    logs: &'a [LogEntry],
+    ui_state: &'a mut UiState,
+    pins: Query<'a, 'a, &Pinned>,
+) -> Vec<&'a LogEntry> {
+    if ui_state.logging_regex {
+        match Regex::try_compile(&ui_state.logging_filter) {
+            Some(e) => {
+                ui_state.regex_error = Some(format!("Invalid regex: {}", e));
+                vec![]
+            }
+            None => {
+                let regex = Regex::new(ui_state.logging_filter.clone());
+                ui_state.regex_error = None;
+                logs.iter()
+                    .filter(|log| {
+                        pins.get(log.entry.entity).is_ok() && regex.is_match(&log.entry.text)
+                    })
+                    .collect::<Vec<_>>()
+            }
+        }
+    } else {
+        ui_state.regex_error = None;
+        logs.iter()
+            .filter(|log| {
+                pins.get(log.entry.entity).is_ok()
+                    && log.entry.text.contains(&ui_state.logging_filter)
+            })
+            .collect::<Vec<&LogEntry>>()
+    }
 }
 
 #[measured]
@@ -394,8 +468,10 @@ pub fn render_manufacturers_stats(
     buy_orders: Query<&BuyOrder>,
     names: Query<&Name>,
     workers: Query<&Worker>,
-    mut sort_order: ResMut<UiState>,
+    pins: Query<&Pinned>,
+    mut ui_state: ResMut<UiState>,
     price_history: Res<PriceHistory>,
+    mut commands: Commands,
 ) {
     Window::new("Manufacturers").show(egui_context.ctx_mut(), |ui| {
         let mut owner_counts: HashMap<Entity, usize> = HashMap::new();
@@ -409,6 +485,7 @@ pub fn render_manufacturers_stats(
             .cell_layout(Layout::left_to_right(Align::Center))
             .column(Column::auto())
             .column(Column::auto())
+            .column(Column::auto())
             .column(Column::initial(80.0).range(80.0..=200.0))
             .column(Column::auto())
             .column(Column::auto())
@@ -420,43 +497,48 @@ pub fn render_manufacturers_stats(
         table
             .header(20.0, |mut header| {
                 header.col(|ui| {
+                    if ui.button("Pin").clicked() {
+                        ui_state.manufacturers_pinned = !ui_state.manufacturers_pinned;
+                    }
+                });
+                header.col(|ui| {
                     if ui.button("Name").clicked() {
-                        sort_order.manufacturers = ManufacturerSort::Name;
+                        ui_state.manufacturers = ManufacturerSort::Name;
                     }
                 });
                 header.col(|ui| {
                     if ui.button("Produces").clicked() {
-                        sort_order.manufacturers = ManufacturerSort::Production;
+                        ui_state.manufacturers = ManufacturerSort::Production;
                     }
                 });
                 header.col(|ui| {
                     if ui.button("Money").clicked() {
-                        sort_order.manufacturers = ManufacturerSort::Money;
+                        ui_state.manufacturers = ManufacturerSort::Money;
                     }
                 });
                 header.col(|ui| {
                     if ui.button("Workers").clicked() {
-                        sort_order.manufacturers = ManufacturerSort::Workers;
+                        ui_state.manufacturers = ManufacturerSort::Workers;
                     }
                 });
                 header.col(|ui| {
                     if ui.button("Items").clicked() {
-                        sort_order.manufacturers = ManufacturerSort::Items;
+                        ui_state.manufacturers = ManufacturerSort::Items;
                     }
                 });
                 header.col(|ui| {
                     if ui.button("Items to sell").clicked() {
-                        sort_order.manufacturers = ManufacturerSort::ItemsToSell;
+                        ui_state.manufacturers = ManufacturerSort::ItemsToSell;
                     }
                 });
                 header.col(|ui| {
                     if ui.button("On market").clicked() {
-                        sort_order.manufacturers = ManufacturerSort::OnMarket;
+                        ui_state.manufacturers = ManufacturerSort::OnMarket;
                     }
                 });
                 header.col(|ui| {
                     if ui.button("Buy orders").clicked() {
-                        sort_order.manufacturers = ManufacturerSort::BuyOrders;
+                        ui_state.manufacturers = ManufacturerSort::BuyOrders;
                     }
                 });
             })
@@ -483,6 +565,8 @@ pub fn render_manufacturers_stats(
                 let mut rows = manufacturers
                     .iter()
                     .map(|(entity, name, wallet, manufacturer)| ManufacturerRow {
+                        entity,
+                        pinned: pins.get(entity).is_ok(),
                         name: name.to_string(),
                         production: manufacturer.production_cycle.output.0.name.to_string(),
                         production_text: format!("{}", manufacturer.production_cycle),
@@ -523,7 +607,7 @@ pub fn render_manufacturers_stats(
                             .join("\n"),
                     })
                     .collect::<Vec<_>>();
-                match sort_order.manufacturers {
+                match ui_state.manufacturers {
                     ManufacturerSort::Name => {
                         rows.sort_by(|a, b| a.name.partial_cmp(&b.name).unwrap())
                     }
@@ -552,6 +636,15 @@ pub fn render_manufacturers_stats(
 
                 for r in rows.iter() {
                     body.row(20.0, |mut row| {
+                        row.col(|ui| {
+                            if r.pinned {
+                                if ui.button("U").on_hover_text("Unpin this person").clicked() {
+                                    commands.entity(r.entity).remove::<Pinned>();
+                                }
+                            } else if ui.button("P").on_hover_text("Pin this person").clicked() {
+                                commands.entity(r.entity).insert(Pinned {});
+                            }
+                        });
                         row.col(|ui| {
                             ui.label(&r.name);
                         });
@@ -755,9 +848,14 @@ fn items_to_string(items: &HashMap<ItemType, Vec<Entity>>) -> String {
 #[derive(Resource)]
 pub struct UiState {
     pub manufacturers: ManufacturerSort,
+    pub manufacturers_pinned: bool,
     pub people: PeopleSort,
     pub people_pinned: bool,
     pub logging_filter: String,
+    pub logging_case_sensitive: bool,
+    pub logging_regex: bool,
+    pub logging_fuzzy: bool,
+    pub regex_error: Option<String>,
 }
 
 pub enum ManufacturerSort {
@@ -781,13 +879,15 @@ pub enum PeopleSort {
 }
 
 struct ManufacturerRow {
-    pub name: String,
-    pub production: String,
-    pub money: Money,
-    pub workers: usize,
-    pub items: usize,
-    pub items_to_sell: usize,
-    pub on_market: usize,
+    entity: Entity,
+    pinned: bool,
+    name: String,
+    production: String,
+    money: Money,
+    workers: usize,
+    items: usize,
+    items_to_sell: usize,
+    on_market: usize,
     on_market_text: String,
     buy_orders: usize,
     items_text: String,

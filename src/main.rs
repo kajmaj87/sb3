@@ -52,9 +52,14 @@ fn main() {
         .insert_resource(debug_ui::Performance::new(100))
         .insert_resource(ui::UiState {
             manufacturers: ManufacturerSort::Name,
+            manufacturers_pinned: false,
             people: PeopleSort::Name,
             people_pinned: false,
             logging_filter: "".to_string(),
+            logging_case_sensitive: false,
+            logging_regex: false,
+            logging_fuzzy: false,
+            regex_error: None,
         })
         .insert_resource(logs::Logs::default())
         .add_event::<commands::GameCommand>()
