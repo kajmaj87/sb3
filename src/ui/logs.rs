@@ -1,8 +1,9 @@
 use bevy::prelude::{Query, Res, ResMut};
-use bevy_egui::egui::{Hyperlink, ScrollArea, Slider, TextEdit, Widget, Window};
+use bevy_egui::egui::{DragValue, Hyperlink, ScrollArea, Slider, TextEdit, Widget, Window};
 use bevy_egui::EguiContexts;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
+use std::collections::VecDeque;
 use syntect::parsing::Regex;
 
 use macros::measured;
@@ -55,6 +56,10 @@ pub fn render_logs(
                 link.ui(ui);
             });
             ui.add(Slider::new(&mut ui_state.fuzzy_match_threshold, 0..=100).text("Fuzzy match threshold"));
+            ui.horizontal(|ui| {
+                ui.label("Max log lines after applied filtering:");
+                ui.add(DragValue::new(&mut ui_state.max_log_lines).speed(10));
+            });
         });
         ScrollArea::vertical().show(ui, |ui| {
             let shown_logs = filter_logs(&logs.entries, &mut ui_state, pins);
@@ -74,7 +79,7 @@ pub fn render_logs(
 }
 
 fn filter_logs<'a>(
-    logs: &'a [LogEntry],
+    logs: &'a VecDeque<LogEntry>,
     ui_state: &'a mut UiState,
     pins: Query<'a, 'a, &Pinned>,
 ) -> Vec<&'a LogEntry> {
@@ -91,6 +96,7 @@ fn filter_logs<'a>(
                     .filter(|log| {
                         pins.get(log.entry.entity).is_ok() && regex.is_match(&log.entry.text)
                     })
+                    .take(ui_state.max_log_lines)
                     .collect::<Vec<_>>()
             }
         },
@@ -105,6 +111,7 @@ fn filter_logs<'a>(
                             ui_state,
                         ) || ui_state.logging_filter.is_empty())
                 })
+                .take(ui_state.max_log_lines)
                 .collect::<Vec<&LogEntry>>()
         }
     }

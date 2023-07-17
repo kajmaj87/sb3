@@ -131,6 +131,7 @@ pub struct UiState {
     pub people_pinned: bool,
     pub logging_filter: String,
     pub logging_filter_type: LoggingFilterType,
+    pub max_log_lines: usize,
     pub fuzzy_match_threshold: i64,
     pub regex_error: Option<String>,
 }

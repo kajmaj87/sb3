@@ -62,6 +62,7 @@ fn main() {
             people_pinned: false,
             logging_filter: "".to_string(),
             logging_filter_type: LoggingFilterType::Fuzzy,
+            max_log_lines: 250,
             fuzzy_match_threshold: 50,
             regex_error: None,
         })

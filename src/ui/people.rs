@@ -21,7 +21,7 @@ pub fn render_people_stats(
     people: Query<(Entity, &Name, &Wallet, &Person)>,
     workers: Query<&Worker>,
     manufacturers: Query<(Entity, &Name, &Manufacturer)>,
-    mut sort_order: ResMut<UiState>,
+    mut ui_state: ResMut<UiState>,
     pinned: Query<&Pinned>,
     mut commands: Commands,
 ) {
@@ -43,37 +43,37 @@ pub fn render_people_stats(
             .header(20.0, |mut header| {
                 header.col(|ui| {
                     if ui.button("Pin").clicked() {
-                        sort_order.people_pinned = !sort_order.people_pinned;
+                        ui_state.people_pinned = !ui_state.people_pinned;
                     }
                 });
                 header.col(|ui| {
                     if ui.button("Name").clicked() {
-                        sort_order.people = PeopleSort::Name;
+                        ui_state.people = PeopleSort::Name;
                     }
                 });
                 header.col(|ui| {
                     if ui.button("Money").clicked() {
-                        sort_order.people = PeopleSort::Money;
+                        ui_state.people = PeopleSort::Money;
                     }
                 });
                 header.col(|ui| {
                     if ui.button("Items").clicked() {
-                        sort_order.people = PeopleSort::Items;
+                        ui_state.people = PeopleSort::Items;
                     }
                 });
                 header.col(|ui| {
                     if ui.button("Utility").clicked() {
-                        sort_order.people = PeopleSort::Utility;
+                        ui_state.people = PeopleSort::Utility;
                     }
                 });
                 header.col(|ui| {
                     if ui.button("Employer").clicked() {
-                        sort_order.people = PeopleSort::Employer;
+                        ui_state.people = PeopleSort::Employer;
                     }
                 });
                 header.col(|ui| {
                     if ui.button("Salary").clicked() {
-                        sort_order.people = PeopleSort::Salary;
+                        ui_state.people = PeopleSort::Salary;
                     }
                 });
             })
@@ -103,7 +103,7 @@ pub fn render_people_stats(
                         salary: workers.get(entity).map(|w| w.salary).unwrap_or(Money(0)),
                     })
                     .collect::<Vec<_>>();
-                match sort_order.people {
+                match ui_state.people {
                     PeopleSort::Name => rows.sort_by(|a, b| a.name.partial_cmp(&b.name).unwrap()),
                     PeopleSort::Money => {
                         rows.sort_by(|a, b| b.money.partial_cmp(&a.money).unwrap())
@@ -122,10 +122,7 @@ pub fn render_people_stats(
                     }
                 }
 
-                for r in rows
-                    .iter()
-                    .filter(|r| r.pinned || !sort_order.people_pinned)
-                {
+                for r in rows.iter().filter(|r| r.pinned || !ui_state.people_pinned) {
                     body.row(20.0, |mut row| {
                         row.col(|ui| {
                             if r.pinned {

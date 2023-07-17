@@ -191,7 +191,10 @@ pub fn render_manufacturers_stats(
                     }
                 }
 
-                for r in rows.iter() {
+                for r in rows
+                    .iter()
+                    .filter(|r| r.pinned || !ui_state.manufacturers_pinned)
+                {
                     body.row(20.0, |mut row| {
                         row.col(|ui| {
                             if r.pinned {

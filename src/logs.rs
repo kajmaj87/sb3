@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use std::collections::VecDeque;
 
 use crate::Days;
 
@@ -18,7 +19,7 @@ pub struct LogEntry {
 
 #[derive(Resource, Default)]
 pub struct Logs {
-    pub entries: Vec<LogEntry>,
+    pub entries: VecDeque<LogEntry>,
 }
 
 pub fn logging_system(
@@ -27,7 +28,7 @@ pub fn logging_system(
     days: Res<Days>,
 ) {
     for log in new_logs.iter() {
-        logs.entries.push(LogEntry {
+        logs.entries.push_front(LogEntry {
             entry: log.clone(),
             day: days.days as u32,
         });
