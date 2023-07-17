@@ -1,27 +1,29 @@
-mod business;
-mod commands;
-mod config;
-mod debug_ui;
-mod init;
-mod logs;
-mod logs_ui;
-mod money;
-mod people;
-mod stats;
-mod ui;
-mod user_input;
+use std::fs::File;
 
-use crate::config::Config;
-use crate::logs_ui::LoggingFilterType;
-use crate::ui::{ManufacturerSort, PeopleSort};
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::log::LogPlugin;
 use bevy::prelude::*;
 use bevy_egui::EguiPlugin;
 use serde::Deserialize;
 use serde_json::from_reader;
-use std::fs::File;
-use ui::UiState;
+
+use ui::main_layout::UiState;
+use ui::manufacturers::ManufacturerSort;
+use ui::people::PeopleSort;
+
+use crate::config::Config;
+use crate::ui::logs::LoggingFilterType;
+
+mod business;
+mod commands;
+mod config;
+mod init;
+mod logs;
+mod money;
+mod people;
+mod stats;
+mod ui;
+mod user_input;
 
 #[derive(Deserialize, Resource, Debug)]
 pub struct BuildInfo {
@@ -52,7 +54,7 @@ fn main() {
         .insert_resource(people::Needs::default())
         .insert_resource(people::Items::default())
         .insert_resource(info)
-        .insert_resource(debug_ui::Performance::new(100))
+        .insert_resource(ui::debug::Performance::new(100))
         .insert_resource(UiState {
             manufacturers: ManufacturerSort::Name,
             manufacturers_pinned: false,
@@ -89,17 +91,17 @@ fn main() {
         )
         .add_systems(Update, commands::command_system)
         .add_systems(Update, logs::logging_system)
-        .add_systems(Update, debug_ui::debug_window)
+        .add_systems(Update, ui::debug::debug_window)
         .add_systems(
             Update,
             (
-                ui::render_manufacturers_stats,
-                ui::render_people_stats,
-                ui::render_panels,
-                ui::render_price_history,
-                ui::render_template_editor,
-                ui::render_todays_prices,
-                logs_ui::render_logs,
+                ui::manufacturers::render_manufacturers_stats,
+                ui::people::render_people_stats,
+                ui::main_layout::render_panels,
+                ui::prices::render_price_history,
+                ui::template::render_template_editor,
+                ui::prices::render_todays_prices,
+                ui::logs::render_logs,
             ),
         )
         .add_systems(PostUpdate, turn_end_system)

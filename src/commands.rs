@@ -1,6 +1,7 @@
+use bevy::prelude::{Event, EventReader, Res, ResMut, Time};
+
 use crate::config::Config;
 use crate::Days;
-use bevy::prelude::{Event, EventReader, Res, ResMut, Time};
 
 const BASE_SECONDS_PER_DAY: f32 = 1.0;
 

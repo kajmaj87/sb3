@@ -1,3 +1,14 @@
+use std::collections::{HashMap, HashSet};
+use std::error::Error;
+use std::fs::File;
+use std::io::Read;
+
+use bevy::core::Name;
+use bevy::log::info;
+use bevy::prelude::*;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+
 use crate::business::{
     BuyStrategy, Inventory, ItemType, Manufacturer, ManufacturerBundle, ProductionCycle,
     SellStrategy, TransactionLog, Wallet, Worker,
@@ -7,15 +18,6 @@ use crate::money::Money;
 use crate::people;
 use crate::people::{Items, Person};
 use crate::people::{Names, Needs};
-use bevy::core::Name;
-use bevy::log::info;
-use bevy::prelude::*;
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
-use std::error::Error;
-use std::fs::File;
-use std::io::Read;
 
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum TemplateType {

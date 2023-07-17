@@ -1,15 +1,18 @@
-use crate::debug_ui::Performance;
-use crate::logs::LogEvent;
-use crate::money::Money;
-use crate::people::Person;
-use crate::Days;
-use bevy::prelude::*;
-use macros::measured;
-use rand::seq::SliceRandom;
-use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+
+use bevy::prelude::*;
+use rand::seq::SliceRandom;
+use serde::{Deserialize, Serialize};
+
+use macros::measured;
+
+use crate::logs::LogEvent;
+use crate::money::Money;
+use crate::people::Person;
+use crate::ui::debug::Performance;
+use crate::Days;
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, Ord, PartialOrd, Deserialize)]
 pub struct ItemType {

@@ -1,15 +1,17 @@
-use crate::business::{BuyOrder, Inventory, ItemType, OrderType, Wallet};
-use crate::debug_ui::Performance;
-use crate::stats::PriceHistory;
+use std::collections::HashMap;
+
 use bevy::prelude::*;
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::prelude::SliceRandom;
 use rand::Rng;
 use serde::{Deserialize, Deserializer};
-use std::collections::HashMap;
 
-use crate::logs::LogEvent;
 use macros::measured;
+
+use crate::business::{BuyOrder, Inventory, ItemType, OrderType, Wallet};
+use crate::logs::LogEvent;
+use crate::stats::PriceHistory;
+use crate::ui::debug::Performance;
 
 #[derive(Debug, Deserialize, Resource, Default, Clone)]
 pub struct Names {

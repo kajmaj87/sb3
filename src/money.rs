@@ -1,9 +1,10 @@
-use serde::de::Error as DeError;
-use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
 use std::str::FromStr;
+
+use serde::de::Error as DeError;
+use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 pub struct Money(pub u64);

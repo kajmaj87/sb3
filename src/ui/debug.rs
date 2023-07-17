@@ -1,13 +1,15 @@
-use crate::business::Wallet;
-use crate::money::Money;
+use std::cmp::Ordering;
+use std::collections::{HashMap, VecDeque};
+use std::time::Duration;
+
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::prelude::*;
 use bevy_egui::egui::Window;
 use bevy_egui::{egui, EguiContexts};
 use egui_extras::{Column, TableBuilder};
-use std::cmp::Ordering;
-use std::collections::{HashMap, VecDeque};
-use std::time::Duration;
+
+use crate::business::Wallet;
+use crate::money::Money;
 
 #[derive(Resource)]
 pub struct Performance {

@@ -1,5 +1,6 @@
-use crate::Days;
 use bevy::prelude::*;
+
+use crate::Days;
 
 #[derive(Component)]
 pub struct Pinned {}

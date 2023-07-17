@@ -1,5 +1,6 @@
-use crate::commands::GameCommand;
 use bevy::{input::Input, prelude::*};
+
+use crate::commands::GameCommand;
 
 pub fn input_system(
     keyboard_input: Res<Input<KeyCode>>,

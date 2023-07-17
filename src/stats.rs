@@ -1,9 +1,11 @@
+use std::collections::{BTreeMap, HashMap};
+use std::fmt;
+
+use bevy::prelude::{debug, Query, Res, ResMut, Resource};
+
 use crate::business::{ItemType, SellOrder};
 use crate::money::Money;
 use crate::Days;
-use bevy::prelude::{debug, Query, Res, ResMut, Resource};
-use std::collections::{BTreeMap, HashMap};
-use std::fmt;
 
 #[derive(Debug)]
 pub struct PriceStats {

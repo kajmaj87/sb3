@@ -1,10 +1,11 @@
+use std::env;
+use std::fs::File;
+use std::process::Command;
+
 use chrono::{DateTime, Utc};
 use chrono_tz::Europe::Warsaw;
 use serde::Serialize;
 use serde_json::to_writer_pretty;
-use std::env;
-use std::fs::File;
-use std::process::Command;
 
 #[derive(Serialize)]
 struct BuildInfo {

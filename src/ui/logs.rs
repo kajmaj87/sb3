@@ -1,13 +1,15 @@
-use crate::debug_ui::Performance;
-use crate::logs::{LogEntry, Logs, Pinned};
-use crate::ui::UiState;
 use bevy::prelude::{Query, Res, ResMut};
 use bevy_egui::egui::{Hyperlink, ScrollArea, Slider, TextEdit, Widget, Window};
 use bevy_egui::EguiContexts;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
-use macros::measured;
 use syntect::parsing::Regex;
+
+use macros::measured;
+
+use crate::logs::{LogEntry, Logs, Pinned};
+use crate::ui::debug::Performance;
+use crate::ui::main_layout::UiState;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LoggingFilterType {
