@@ -1,4 +1,5 @@
 use crate::debug_ui::Performance;
+use crate::logs::LogEvent;
 use crate::money::Money;
 use crate::people::Person;
 use crate::Days;
@@ -456,6 +457,7 @@ pub fn execute_orders(
     mut trade_participants: Query<(Entity, &Name, &mut Wallet, &mut TransactionLog)>,
     mut buy_strategy: Query<(Entity, &mut BuyStrategy)>,
     mut items: Query<(Entity, &mut Item)>,
+    mut logs: EventWriter<LogEvent>,
     date: Res<Days>,
 ) {
     let mut rng = rand::thread_rng();
@@ -518,6 +520,7 @@ pub fn execute_orders(
                             (sell_order_id, sell_order),
                             (buy_order_id, buy_order),
                             &mut items,
+                            &mut logs,
                             &date,
                         ) {
                             already_sold.insert(sell_order_id);
@@ -546,6 +549,7 @@ pub fn execute_orders(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn execute_order(
     buy_strategy: &mut Query<(Entity, &mut BuyStrategy)>,
     trade_participants: &mut Query<(Entity, &Name, &mut Wallet, &mut TransactionLog)>,
@@ -553,6 +557,7 @@ fn execute_order(
     sell_order: (Entity, &SellOrder),
     buy_order: (Entity, &BuyOrder),
     items: &mut Query<(Entity, &mut Item)>,
+    logs: &mut EventWriter<LogEvent>,
     _date: &Res<Days>,
 ) -> bool {
     let (sell_order_id, sell_order) = sell_order;
@@ -612,6 +617,13 @@ fn execute_order(
             "{}: !!!! Executed order: {:?} -> {:?} (buyer got his goods)",
             name, buy_order, sell_order
         );
+        logs.send(LogEvent {
+            text: format!(
+                "{}: I bought {} for {}",
+                name, buy_order.item_type.name, sell_order.price
+            ),
+            entity: buy_order.buyer,
+        });
     } else {
         warn!("Buyer does not exist");
     }

@@ -8,6 +8,7 @@ use rand::Rng;
 use serde::{Deserialize, Deserializer};
 use std::collections::HashMap;
 
+use crate::logs::LogEvent;
 use macros::measured;
 
 #[derive(Debug, Deserialize, Resource, Default, Clone)]
@@ -174,6 +175,7 @@ pub fn create_buy_orders_for_people(
     mut people: Query<(Entity, &Name, &Wallet, &mut Person)>,
     needs: Res<Needs>,
     price_history: Res<PriceHistory>,
+    mut logs: EventWriter<LogEvent>,
     mut commands: Commands,
 ) {
     let mut rng = rand::thread_rng();
@@ -188,14 +190,14 @@ pub fn create_buy_orders_for_people(
         if let Some(money_utility) =
             calculate_money_utility(&person_marginal_utilities, &price_history)
         {
-            info!("Money utility for {} is {}", name, money_utility);
+            debug!("Money utility for {} is {}", name, money_utility);
             let utilities_with_prices = calculate_marginal_utilities_adjusted_by_prices(
                 &person_marginal_utilities,
                 &price_history,
                 money_utility,
             );
             // info!("Utilities without prices for {} are:\n {:#?}", name, person_marginal_utilities);
-            info!(
+            debug!(
                 "Utilities with prices for {} are:\n {:#?}",
                 name, utilities_with_prices
             );
@@ -222,6 +224,13 @@ pub fn create_buy_orders_for_people(
                 order: OrderType::Market, // Always buying at market price
                 expiration: Some(10),
             };
+            logs.send(LogEvent {
+                text: format!(
+                    "{}: I'll try to buy {} at market price",
+                    name, item_type.name
+                ),
+                entity: buyer,
+            });
             commands.spawn((
                 buy_order.clone(),
                 Name::new(format!("Consumer {} buy order @Market", item_type.name)),

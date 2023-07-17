@@ -3,6 +3,7 @@ mod commands;
 mod config;
 mod debug_ui;
 mod init;
+mod logs;
 mod money;
 mod people;
 mod stats;
@@ -49,11 +50,15 @@ fn main() {
         .insert_resource(people::Items::default())
         .insert_resource(info)
         .insert_resource(debug_ui::Performance::new(100))
-        .insert_resource(ui::SortOrder {
+        .insert_resource(ui::UiState {
             manufacturers: ManufacturerSort::Name,
             people: PeopleSort::Name,
+            people_pinned: false,
+            logging_filter: "".to_string(),
         })
+        .insert_resource(logs::Logs::default())
         .add_event::<commands::GameCommand>()
+        .add_event::<logs::LogEvent>()
         .add_systems(Startup, (init::init_people, init::init_manufacturers))
         .add_systems(First, user_input::input_system)
         .add_systems(PreUpdate, date_update_system.run_if(should_advance_day))
@@ -76,6 +81,7 @@ fn main() {
                 .run_if(next_turn),
         )
         .add_systems(Update, commands::command_system)
+        .add_systems(Update, logs::logging_system)
         .add_systems(Update, debug_ui::debug_window)
         .add_systems(
             Update,
@@ -86,6 +92,7 @@ fn main() {
                 ui::render_price_history,
                 ui::render_template_editor,
                 ui::render_todays_prices,
+                ui::render_logs,
             ),
         )
         .add_systems(PostUpdate, turn_end_system)

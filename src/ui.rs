@@ -2,17 +2,19 @@ use crate::business::{BuyOrder, ItemType, Manufacturer, SellOrder, Wallet, Worke
 use crate::commands::GameCommand;
 use crate::debug_ui::Performance;
 use crate::init::{ManufacturerTemplate, ProductionCycleTemplate, TemplateType, Templates};
+use crate::logs::{Logs, Pinned};
 use crate::money::Money;
 use crate::people::Person;
 use crate::stats::PriceHistory;
 use crate::{BuildInfo, Days};
 use bevy::core::Name;
-use bevy::prelude::{Entity, EventWriter, Query, Res, ResMut, Resource};
+use bevy::prelude::{Commands, Entity, EventWriter, Query, Res, ResMut, Resource};
 use bevy_egui::egui::plot::{
     BoxElem, BoxPlot, BoxSpread, Legend, Line, LineStyle, Plot, PlotPoints,
 };
 use bevy_egui::egui::{
-    Align, Button, Color32, Hyperlink, Layout, SidePanel, TopBottomPanel, Ui, Widget, Window,
+    Align, Button, Color32, Hyperlink, Layout, SidePanel, TextEdit, TopBottomPanel, Ui, Widget,
+    Window,
 };
 use bevy_egui::{egui, EguiContexts};
 use egui_extras::{Column, TableBuilder};
@@ -108,6 +110,41 @@ pub fn render_template_editor(mut egui_context: EguiContexts, mut templates: Res
                     .desired_width(f32::INFINITY),
                 // .layouter(&mut layouter),
             );
+        });
+    });
+}
+
+#[measured]
+pub fn render_logs(
+    mut egui_context: EguiContexts,
+    logs: Res<Logs>,
+    pins: Query<&Pinned>,
+    mut ui_state: ResMut<UiState>,
+) {
+    Window::new("Logs").show(egui_context.ctx_mut(), |ui| {
+        TextEdit::singleline(&mut ui_state.logging_filter)
+            .desired_width(f32::INFINITY)
+            .show(ui);
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            let shown_logs = logs
+                .entries
+                .iter()
+                .filter(|log| {
+                    pins.get(log.entry.entity).is_ok()
+                        && log.entry.text.contains(&ui_state.logging_filter)
+                })
+                .collect::<Vec<_>>();
+            let mut log_text = shown_logs
+                .iter()
+                .map(|log| format!("Day: {} | {}", log.day, log.entry.text.as_str()))
+                .collect::<Vec<_>>()
+                .join("\n");
+            TextEdit::multiline(&mut log_text)
+                .desired_rows(10)
+                .lock_focus(true)
+                .interactive(false)
+                .desired_width(f32::INFINITY)
+                .show(ui);
         });
     });
 }
@@ -357,7 +394,7 @@ pub fn render_manufacturers_stats(
     buy_orders: Query<&BuyOrder>,
     names: Query<&Name>,
     workers: Query<&Worker>,
-    mut sort_order: ResMut<SortOrder>,
+    mut sort_order: ResMut<UiState>,
     price_history: Res<PriceHistory>,
 ) {
     Window::new("Manufacturers").show(egui_context.ctx_mut(), |ui| {
@@ -556,13 +593,16 @@ fn label_with_hover_text(ui: &mut Ui, amount: usize, hover_text: &str) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 #[measured]
 pub fn render_people_stats(
     mut egui_context: EguiContexts,
     people: Query<(Entity, &Name, &Wallet, &Person)>,
     workers: Query<&Worker>,
     manufacturers: Query<(Entity, &Name, &Manufacturer)>,
-    mut sort_order: ResMut<SortOrder>,
+    mut sort_order: ResMut<UiState>,
+    pinned: Query<&Pinned>,
+    mut commands: Commands,
 ) {
     Window::new("People").show(egui_context.ctx_mut(), |ui| {
         let table = TableBuilder::new(ui)
@@ -575,10 +615,16 @@ pub fn render_people_stats(
             .column(Column::auto())
             .column(Column::auto())
             .column(Column::auto())
+            .column(Column::auto())
             .min_scrolled_height(0.0);
 
         table
             .header(20.0, |mut header| {
+                header.col(|ui| {
+                    if ui.button("Pin").clicked() {
+                        sort_order.people_pinned = !sort_order.people_pinned;
+                    }
+                });
                 header.col(|ui| {
                     if ui.button("Name").clicked() {
                         sort_order.people = PeopleSort::Name;
@@ -614,6 +660,8 @@ pub fn render_people_stats(
                 let mut rows = people
                     .iter()
                     .map(|(entity, name, wallet, person)| PersonRow {
+                        entity,
+                        pinned: pinned.get(entity).is_ok(),
                         name: name.to_string(),
                         money: wallet.money,
                         items: count_items(&person.assets.items),
@@ -653,8 +701,20 @@ pub fn render_people_stats(
                     }
                 }
 
-                for r in rows.iter() {
+                for r in rows
+                    .iter()
+                    .filter(|r| r.pinned || !sort_order.people_pinned)
+                {
                     body.row(20.0, |mut row| {
+                        row.col(|ui| {
+                            if r.pinned {
+                                if ui.button("U").on_hover_text("Unpin this person").clicked() {
+                                    commands.entity(r.entity).remove::<Pinned>();
+                                }
+                            } else if ui.button("P").on_hover_text("Pin this person").clicked() {
+                                commands.entity(r.entity).insert(Pinned {});
+                            }
+                        });
                         row.col(|ui| {
                             ui.label(&r.name);
                         });
@@ -693,9 +753,11 @@ fn items_to_string(items: &HashMap<ItemType, Vec<Entity>>) -> String {
 }
 
 #[derive(Resource)]
-pub struct SortOrder {
+pub struct UiState {
     pub manufacturers: ManufacturerSort,
     pub people: PeopleSort,
+    pub people_pinned: bool,
+    pub logging_filter: String,
 }
 
 pub enum ManufacturerSort {
@@ -735,13 +797,15 @@ struct ManufacturerRow {
 }
 
 struct PersonRow {
-    pub name: String,
-    pub money: Money,
+    entity: Entity,
+    name: String,
+    money: Money,
     items: usize,
     utility: f64,
     items_text: String,
     employed_at: String,
     salary: Money,
+    pinned: bool,
 }
 
 // pub fn create_histogram(name: &str, values: &[u64], bins: u32) -> BarChart {
