@@ -2,7 +2,8 @@ use crate::business::{BuyOrder, ItemType, Manufacturer, SellOrder, Wallet, Worke
 use crate::commands::GameCommand;
 use crate::debug_ui::Performance;
 use crate::init::{ManufacturerTemplate, ProductionCycleTemplate, TemplateType, Templates};
-use crate::logs::{LogEntry, Logs, Pinned};
+use crate::logs::Pinned;
+use crate::logs_ui::LoggingFilterType;
 use crate::money::Money;
 use crate::people::Person;
 use crate::stats::PriceHistory;
@@ -13,8 +14,7 @@ use bevy_egui::egui::plot::{
     BoxElem, BoxPlot, BoxSpread, Legend, Line, LineStyle, Plot, PlotPoints,
 };
 use bevy_egui::egui::{
-    Align, Button, Color32, Hyperlink, Layout, SidePanel, TextEdit, TopBottomPanel, Ui, Widget,
-    Window,
+    Align, Button, Color32, Hyperlink, Layout, SidePanel, TopBottomPanel, Ui, Widget, Window,
 };
 use bevy_egui::{egui, EguiContexts};
 use egui_extras::{Column, TableBuilder};
@@ -23,7 +23,6 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, HashMap};
 use std::hash::{Hash, Hasher};
 use std::process::Command;
-use syntect::parsing::Regex;
 
 #[measured]
 pub fn render_template_editor(mut egui_context: EguiContexts, mut templates: ResMut<Templates>) {
@@ -113,114 +112,6 @@ pub fn render_template_editor(mut egui_context: EguiContexts, mut templates: Res
             );
         });
     });
-}
-
-#[measured]
-pub fn render_logs(
-    mut egui_context: EguiContexts,
-    logs: Res<Logs>,
-    pins: Query<&Pinned>,
-    mut ui_state: ResMut<UiState>,
-) {
-    Window::new("Logs").show(egui_context.ctx_mut(), |ui| {
-        ui.horizontal(|ui| {
-            let hint = if ui_state.logging_case_sensitive && !ui_state.logging_regex && !ui_state.logging_fuzzy {
-                "type in something to search (CASE SENSITIVE):"
-            } else if ui_state.logging_regex && ui_state.logging_fuzzy {
-                "regex + fuzzy:"
-            } else if ui_state.logging_regex {
-                "regex:"
-            } else if ui_state.logging_fuzzy {
-                "fuzzy:"
-            } else {
-                "type in something to search (case insensitve):"
-            };
-
-            ui.label("Filter:");
-            ui.add(
-                TextEdit::singleline(&mut ui_state.logging_filter)
-                    .desired_width(200.0)
-                    .hint_text(hint),
-            );
-            if ui.button("uU").clicked() {
-                ui_state.logging_case_sensitive = !ui_state.logging_case_sensitive;
-            }
-            if ui.button("R").clicked() {
-                ui_state.logging_regex = !ui_state.logging_regex;
-            }
-            if ui.button("F").clicked() {
-                ui_state.logging_fuzzy = !ui_state.logging_fuzzy;
-            }
-        });
-        if ui_state.regex_error.is_some() {
-            ui.label(format!("Regex error: {}", ui_state.regex_error.as_ref().unwrap()));
-        }
-        ui.collapsing("Instructions", |ui| {
-            ui.label("Click on a 'P' button in other windows to pin entites. Only pinned entities will be shown here. Click 'U' button to unpin entities. Clicking on 'Pin' column header will list only pinned entities without changing sorting selected");
-            ui.label("Default filtering is case insensitive substring search. Small buttons affect the search mode:");
-            ui.label("Click on 'uU' button to enable case sensitive filtering. It does not have any effect if regex is chosen");
-            ui.horizontal(|ui| {
-                ui.label("Click on 'R' button to enable regex filtering. To learn more about regex visit: ");
-                let link = Hyperlink::from_label_and_url(
-                    "here",
-                    "https://regexr.com/",
-                );
-                link.ui(ui);
-                let link = Hyperlink::from_label_and_url(
-                    " or here",
-                    "https://regexone.com/",
-                );
-                link.ui(ui);
-            });
-            ui.label("Click on 'F' button to enable fuzzy filtering.")
-        });
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            let shown_logs = filter_logs(&logs.entries, &mut ui_state, pins);
-            let mut log_text = shown_logs
-                .iter()
-                .map(|log| format!("Day: {} | {}", log.day, log.entry.text.as_str()))
-                .collect::<Vec<_>>()
-                .join("\n");
-            TextEdit::multiline(&mut log_text)
-                .desired_rows(10)
-                .lock_focus(true)
-                .interactive(false)
-                .desired_width(f32::INFINITY)
-                .show(ui);
-        });
-    });
-}
-
-fn filter_logs<'a>(
-    logs: &'a [LogEntry],
-    ui_state: &'a mut UiState,
-    pins: Query<'a, 'a, &Pinned>,
-) -> Vec<&'a LogEntry> {
-    if ui_state.logging_regex {
-        match Regex::try_compile(&ui_state.logging_filter) {
-            Some(e) => {
-                ui_state.regex_error = Some(format!("Invalid regex: {}", e));
-                vec![]
-            }
-            None => {
-                let regex = Regex::new(ui_state.logging_filter.clone());
-                ui_state.regex_error = None;
-                logs.iter()
-                    .filter(|log| {
-                        pins.get(log.entry.entity).is_ok() && regex.is_match(&log.entry.text)
-                    })
-                    .collect::<Vec<_>>()
-            }
-        }
-    } else {
-        ui_state.regex_error = None;
-        logs.iter()
-            .filter(|log| {
-                pins.get(log.entry.entity).is_ok()
-                    && log.entry.text.contains(&ui_state.logging_filter)
-            })
-            .collect::<Vec<&LogEntry>>()
-    }
 }
 
 #[measured]
@@ -852,9 +743,8 @@ pub struct UiState {
     pub people: PeopleSort,
     pub people_pinned: bool,
     pub logging_filter: String,
-    pub logging_case_sensitive: bool,
-    pub logging_regex: bool,
-    pub logging_fuzzy: bool,
+    pub logging_filter_type: LoggingFilterType,
+    pub fuzzy_match_threshold: i64,
     pub regex_error: Option<String>,
 }
 

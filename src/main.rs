@@ -4,6 +4,7 @@ mod config;
 mod debug_ui;
 mod init;
 mod logs;
+mod logs_ui;
 mod money;
 mod people;
 mod stats;
@@ -11,6 +12,7 @@ mod ui;
 mod user_input;
 
 use crate::config::Config;
+use crate::logs_ui::LoggingFilterType;
 use crate::ui::{ManufacturerSort, PeopleSort};
 use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::log::LogPlugin;
@@ -19,6 +21,7 @@ use bevy_egui::EguiPlugin;
 use serde::Deserialize;
 use serde_json::from_reader;
 use std::fs::File;
+use ui::UiState;
 
 #[derive(Deserialize, Resource, Debug)]
 pub struct BuildInfo {
@@ -50,15 +53,14 @@ fn main() {
         .insert_resource(people::Items::default())
         .insert_resource(info)
         .insert_resource(debug_ui::Performance::new(100))
-        .insert_resource(ui::UiState {
+        .insert_resource(UiState {
             manufacturers: ManufacturerSort::Name,
             manufacturers_pinned: false,
             people: PeopleSort::Name,
             people_pinned: false,
             logging_filter: "".to_string(),
-            logging_case_sensitive: false,
-            logging_regex: false,
-            logging_fuzzy: false,
+            logging_filter_type: LoggingFilterType::Fuzzy,
+            fuzzy_match_threshold: 50,
             regex_error: None,
         })
         .insert_resource(logs::Logs::default())
@@ -97,7 +99,7 @@ fn main() {
                 ui::render_price_history,
                 ui::render_template_editor,
                 ui::render_todays_prices,
-                ui::render_logs,
+                logs_ui::render_logs,
             ),
         )
         .add_systems(PostUpdate, turn_end_system)
