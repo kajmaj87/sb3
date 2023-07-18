@@ -133,5 +133,6 @@ pub struct UiState {
     pub logging_filter_type: LoggingFilterType,
     pub max_log_lines: usize,
     pub fuzzy_match_threshold: i64,
+    pub fuzzy_match_order: bool,
     pub regex_error: Option<String>,
 }

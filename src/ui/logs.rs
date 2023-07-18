@@ -60,6 +60,7 @@ pub fn render_logs(
                 ui.label("Max log lines after applied filtering:");
                 ui.add(DragValue::new(&mut ui_state.max_log_lines).speed(10));
             });
+            ui.checkbox(&mut ui_state.fuzzy_match_order, "Fuzzy match order");
         });
         ScrollArea::vertical().show(ui, |ui| {
             let shown_logs = filter_logs(&logs.entries, &mut ui_state, pins);
@@ -104,17 +105,30 @@ fn filter_logs<'a>(
             ui_state.regex_error = None;
             logs.iter()
                 .filter(|log| {
+                    let haystack = if ui_state.fuzzy_match_order {
+                        log.entry.text.to_ascii_lowercase()
+                    } else {
+                        normalize(&log.entry.text.to_ascii_lowercase())
+                    };
+                    let needle = if ui_state.fuzzy_match_order {
+                        ui_state.logging_filter.to_ascii_lowercase()
+                    } else {
+                        normalize(&ui_state.logging_filter.to_ascii_lowercase())
+                    };
                     pins.get(log.entry.entity).is_ok()
-                        && (is_fuzzy_match(
-                            &log.entry.text.to_ascii_lowercase(),
-                            &ui_state.logging_filter.to_ascii_lowercase(),
-                            ui_state,
-                        ) || ui_state.logging_filter.is_empty())
+                        && (is_fuzzy_match(haystack.as_str(), needle.as_str(), ui_state)
+                            || ui_state.logging_filter.is_empty())
                 })
                 .take(ui_state.max_log_lines)
                 .collect::<Vec<&LogEntry>>()
         }
     }
+}
+
+fn normalize(s: &str) -> String {
+    let mut words: Vec<&str> = s.split_whitespace().collect();
+    words.sort();
+    words.join(" ")
 }
 
 pub fn is_fuzzy_match(haystack: &str, needle: &str, ui_state: &UiState) -> bool {

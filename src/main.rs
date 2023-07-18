@@ -64,6 +64,7 @@ fn main() {
             logging_filter_type: LoggingFilterType::Fuzzy,
             max_log_lines: 250,
             fuzzy_match_threshold: 50,
+            fuzzy_match_order: false,
             regex_error: None,
         })
         .insert_resource(logs::Logs::default())
