@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use std::collections::VecDeque;
 
+use crate::ui::main_layout::UiState;
 use crate::Days;
 
 #[derive(Component)]
@@ -33,4 +34,26 @@ pub fn logging_system(
             day: days.days as u32,
         });
     }
+}
+
+pub fn delete_old_logs_system(
+    mut logs: ResMut<Logs>,
+    days: Res<Days>,
+    pins: Query<&Pinned>,
+    ui_state: Res<UiState>,
+) {
+    let day = days.days as u32;
+    if ui_state.logs_delete_unpinned_old {
+        logs.entries.retain(|log| {
+            keep_pinned(log, &ui_state, &pins) || is_still_young(log, day, &ui_state)
+        });
+    }
+}
+
+fn is_still_young(log: &LogEntry, day: u32, ui_state: &UiState) -> bool {
+    day - log.day < ui_state.logs_delete_unpinned_older_than
+}
+
+fn keep_pinned(log: &LogEntry, ui_state: &UiState, pins: &Query<&Pinned>) -> bool {
+    pins.get(log.entry.entity).is_ok() && ui_state.logs_keep_pinned
 }

@@ -62,6 +62,10 @@ fn main() {
             people_pinned: false,
             logging_filter: "".to_string(),
             logging_filter_type: LoggingFilterType::Fuzzy,
+            logs_delete_unpinned_old: true,
+            logs_delete_unpinned_older_than: 50,
+            logs_keep_pinned: true,
+            logs_show_all_if_no_pins: true,
             max_log_lines: 250,
             fuzzy_match_threshold: 50,
             fuzzy_match_order: false,
@@ -93,6 +97,7 @@ fn main() {
         )
         .add_systems(Update, commands::command_system)
         .add_systems(Update, logs::logging_system)
+        .add_systems(Update, logs::delete_old_logs_system)
         .add_systems(Update, ui::debug::debug_window)
         .add_systems(
             Update,

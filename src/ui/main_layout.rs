@@ -131,8 +131,12 @@ pub struct UiState {
     pub people_pinned: bool,
     pub logging_filter: String,
     pub logging_filter_type: LoggingFilterType,
+    pub logs_delete_unpinned_old: bool,
+    pub logs_delete_unpinned_older_than: u32,
+    pub logs_keep_pinned: bool,
     pub max_log_lines: usize,
     pub fuzzy_match_threshold: i64,
     pub fuzzy_match_order: bool,
     pub regex_error: Option<String>,
+    pub logs_show_all_if_no_pins: bool,
 }

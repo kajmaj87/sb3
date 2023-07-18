@@ -56,11 +56,19 @@ pub fn render_logs(
                 link.ui(ui);
             });
             ui.add(Slider::new(&mut ui_state.fuzzy_match_threshold, 0..=100).text("Fuzzy match threshold"));
+            ui.label(format!("Total log lines: {}", logs.entries.len()));
             ui.horizontal(|ui| {
                 ui.label("Max log lines after applied filtering:");
                 ui.add(DragValue::new(&mut ui_state.max_log_lines).speed(10));
             });
-            ui.checkbox(&mut ui_state.fuzzy_match_order, "Fuzzy match order");
+            ui.checkbox(&mut ui_state.logs_show_all_if_no_pins, "Show all logs if no pins are set");
+            ui.horizontal(|ui| {
+                ui.checkbox(&mut ui_state.logs_delete_unpinned_old, "Delete entries older than:");
+                ui.add(DragValue::new(&mut ui_state.logs_delete_unpinned_older_than).speed(10));
+            });
+            ui.horizontal(|ui| {
+                ui.checkbox(&mut ui_state.logs_keep_pinned, "Keep pinned entries forever");
+            });
         });
         ScrollArea::vertical().show(ui, |ui| {
             let shown_logs = filter_logs(&logs.entries, &mut ui_state, pins);
@@ -95,7 +103,9 @@ fn filter_logs<'a>(
                 ui_state.regex_error = None;
                 logs.iter()
                     .filter(|log| {
-                        pins.get(log.entry.entity).is_ok() && regex.is_match(&log.entry.text)
+                        (pins.get(log.entry.entity).is_ok()
+                            || (pins.iter().count() == 0 && ui_state.logs_show_all_if_no_pins))
+                            && regex.is_match(&log.entry.text)
                     })
                     .take(ui_state.max_log_lines)
                     .collect::<Vec<_>>()
@@ -115,7 +125,8 @@ fn filter_logs<'a>(
                     } else {
                         normalize(&ui_state.logging_filter.to_ascii_lowercase())
                     };
-                    pins.get(log.entry.entity).is_ok()
+                    (pins.get(log.entry.entity).is_ok()
+                        || (pins.iter().count() == 0 && ui_state.logs_show_all_if_no_pins))
                         && (is_fuzzy_match(haystack.as_str(), needle.as_str(), ui_state)
                             || ui_state.logging_filter.is_empty())
                 })
