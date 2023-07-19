@@ -2,11 +2,21 @@ use crate::business::ItemType;
 use crate::logs::LogEvent;
 use crate::money::Money;
 use bevy::prelude::*;
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum TradeSide {
     Pay,
     Receive,
+}
+
+impl fmt::Display for TradeSide {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TradeSide::Pay => write!(f, "Payed for"),
+            TradeSide::Receive => write!(f, "Received"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -25,6 +35,20 @@ pub enum Transaction {
         worker: Entity,
         salary: Money,
     },
+}
+
+impl fmt::Display for Transaction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Transaction::Trade {
+                side,
+                item_type,
+                price,
+                ..
+            } => write!(f, "{} {} for {}", side, price, item_type.name),
+            Transaction::Salary { side, salary, .. } => write!(f, "{} salary: {}", side, salary),
+        }
+    }
 }
 #[derive(Debug, Clone)]
 pub enum TransactionError {
@@ -105,7 +129,17 @@ impl Wallet {
                 worker,
                 salary,
             } => {
-                self.process_payout(other_wallet, side, salary)?;
+                self.process_payout(other_wallet, side.clone(), salary)?;
+                let symmetric_transaction = Transaction::Salary {
+                    side: match side {
+                        TradeSide::Pay => TradeSide::Receive,
+                        TradeSide::Receive => TradeSide::Pay,
+                    },
+                    employer: worker,
+                    worker: employer,
+                    salary,
+                };
+                other_wallet.transactions.push(symmetric_transaction);
                 logs.send(LogEvent::Salary {
                     employer,
                     worker,

@@ -142,6 +142,12 @@ pub fn render_manufacturers_stats(
                             production: manufacturer.production_cycle.output.0.name.to_string(),
                             production_text: format!("{}", manufacturer.production_cycle),
                             money: wallet.money(),
+                            money_text: wallet
+                                .transactions
+                                .iter()
+                                .map(|t| t.to_string())
+                                .collect::<Vec<String>>()
+                                .join("\n"),
                             workers: manufacturer.hired_workers.len(),
                             workers_text: manufacturer
                                 .hired_workers
@@ -230,7 +236,7 @@ pub fn render_manufacturers_stats(
                             ui.label(&r.production).on_hover_text(&r.production_text);
                         });
                         row.col(|ui| {
-                            ui.label(&r.money.to_string());
+                            ui.label(&r.money.to_string()).on_hover_text(&r.money_text);
                         });
                         row.col(|ui| {
                             label_with_hover_text(ui, r.workers, &r.workers_text);
@@ -278,6 +284,7 @@ struct ManufacturerRow {
     name: String,
     production: String,
     money: Money,
+    money_text: String,
     workers: usize,
     items: usize,
     items_to_sell: usize,

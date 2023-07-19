@@ -91,6 +91,12 @@ pub fn render_people_stats(
                         pinned: pinned.get(entity).is_ok(),
                         name: name.to_string(),
                         money: wallet.money(),
+                        money_text: wallet
+                            .transactions
+                            .iter()
+                            .map(|t| t.to_string())
+                            .collect::<Vec<String>>()
+                            .join("\n"),
                         items: count_items(&person.assets.items),
                         items_text: items_to_string(&person.assets.items),
                         utility: person.utility,
@@ -143,7 +149,7 @@ pub fn render_people_stats(
                             ui.label(&r.name);
                         });
                         row.col(|ui| {
-                            ui.label(&r.money.to_string());
+                            ui.label(&r.money.to_string()).on_hover_text(&r.money_text);
                         });
                         row.col(|ui| {
                             label_with_hover_text(ui, r.items, &r.items_text);
@@ -176,6 +182,7 @@ struct PersonRow {
     entity: Entity,
     name: String,
     money: Money,
+    money_text: String,
     items: usize,
     utility: f64,
     items_text: String,
