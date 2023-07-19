@@ -8,10 +8,11 @@ use serde::{Deserialize, Deserializer};
 
 use macros::measured;
 
-use crate::business::{BuyOrder, Inventory, ItemType, OrderType, Wallet};
+use crate::business::{BuyOrder, Inventory, ItemType, OrderType};
 use crate::logs::LogEvent;
 use crate::stats::PriceHistory;
 use crate::ui::debug::Performance;
+use crate::wallet::Wallet;
 
 #[derive(Debug, Deserialize, Resource, Default, Clone)]
 pub struct Names {
@@ -211,10 +212,17 @@ pub fn create_buy_orders_for_people(
             let weights: Vec<f64> = utilities.iter().map(|(_, util)| **util).collect();
 
             // Create a WeightedIndex distribution
-            let dist = WeightedIndex::new(&weights).unwrap();
+            let dist = WeightedIndex::new(&weights);
+            if dist.is_err() {
+                logs.send(LogEvent::Generic {
+                    text: "There is no item I can buy!".to_string(),
+                    entity: buyer,
+                });
+                continue;
+            }
 
             // Sample from it
-            let index = dist.sample(&mut rng);
+            let index = dist.unwrap().sample(&mut rng);
 
             // Get the corresponding item
             let (item_type, _util) = utilities[index];
@@ -226,7 +234,7 @@ pub fn create_buy_orders_for_people(
                 order: OrderType::Market, // Always buying at market price
                 expiration: Some(10),
             };
-            logs.send(LogEvent {
+            logs.send(LogEvent::Generic {
                 text: format!(
                     "{}: I'll try to buy {} at market price",
                     name, item_type.name

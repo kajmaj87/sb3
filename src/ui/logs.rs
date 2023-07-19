@@ -74,7 +74,7 @@ pub fn render_logs(
             let shown_logs = filter_logs(&logs.entries, &mut ui_state, pins);
             let mut log_text = shown_logs
                 .iter()
-                .map(|log| format!("Day: {} | {}", log.day, log.entry.text.as_str()))
+                .map(|log| format!("{}", log))
                 .collect::<Vec<_>>()
                 .join("\n");
             TextEdit::multiline(&mut log_text)
@@ -103,9 +103,9 @@ fn filter_logs<'a>(
                 ui_state.regex_error = None;
                 logs.iter()
                     .filter(|log| {
-                        (pins.get(log.entry.entity).is_ok()
+                        (pins.get(log.entity).is_ok()
                             || (pins.iter().count() == 0 && ui_state.logs_show_all_if_no_pins))
-                            && regex.is_match(&log.entry.text)
+                            && regex.is_match(&log.text)
                     })
                     .take(ui_state.max_log_lines)
                     .collect::<Vec<_>>()
@@ -116,16 +116,16 @@ fn filter_logs<'a>(
             logs.iter()
                 .filter(|log| {
                     let haystack = if ui_state.fuzzy_match_order {
-                        log.entry.text.to_ascii_lowercase()
+                        log.text.to_ascii_lowercase()
                     } else {
-                        normalize(&log.entry.text.to_ascii_lowercase())
+                        normalize(&log.text.to_ascii_lowercase())
                     };
                     let needle = if ui_state.fuzzy_match_order {
                         ui_state.logging_filter.to_ascii_lowercase()
                     } else {
                         normalize(&ui_state.logging_filter.to_ascii_lowercase())
                     };
-                    (pins.get(log.entry.entity).is_ok()
+                    (pins.get(log.entity).is_ok()
                         || (pins.iter().count() == 0 && ui_state.logs_show_all_if_no_pins))
                         && (is_fuzzy_match(haystack.as_str(), needle.as_str(), ui_state)
                             || ui_state.logging_filter.is_empty())

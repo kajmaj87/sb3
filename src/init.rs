@@ -11,13 +11,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::business::{
     BuyStrategy, Inventory, ItemType, Manufacturer, ManufacturerBundle, ProductionCycle,
-    SellStrategy, TransactionLog, Wallet, Worker,
+    SellStrategy, Worker,
 };
 use crate::money::money_from_str_or_num;
 use crate::money::Money;
 use crate::people;
 use crate::people::{Items, Person};
 use crate::people::{Names, Needs};
+use crate::wallet::Wallet;
 
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum TemplateType {
@@ -186,9 +187,8 @@ impl ManufacturerTemplate {
                     commands
                         .spawn((
                             *w,
-                            Wallet { money: Money(0) },
+                            Wallet::default(),
                             Person::default(),
-                            TransactionLog::default(),
                             Name::new(people::generate_name(names)),
                         ))
                         .id()
@@ -205,12 +205,10 @@ impl ManufacturerTemplate {
                         items_to_sell: Default::default(),
                     },
                     hired_workers: workers,
+                    delay_to_fire_next_worker: 150,
                 },
-                wallet: Wallet {
-                    money: self.money,
-                },
+                wallet: Wallet::new(self.money),
                 sell_strategy: self.sell_strategy,
-                transaction_log: TransactionLog::default(),
             };
             manufacturers.push(manufacturer);
         }
@@ -250,6 +248,7 @@ impl ProductionCycleTemplate {
             input,
             output,
             workdays_needed: self.workdays_needed,
+            workdays_left: self.workdays_needed,
         };
 
         (self.name.clone(), production_cycle)

@@ -6,13 +6,14 @@ use egui_extras::{Column, TableBuilder};
 
 use macros::measured;
 
-use crate::business::{Manufacturer, Wallet, Worker};
+use crate::business::{Manufacturer, Worker};
 use crate::logs::Pinned;
 use crate::money::Money;
 use crate::people::Person;
 use crate::ui::debug::Performance;
 use crate::ui::main_layout::UiState;
 use crate::ui::utilities::{count_items, items_to_string, label_with_hover_text};
+use crate::wallet::Wallet;
 
 #[allow(clippy::too_many_arguments)]
 #[measured]
@@ -26,6 +27,11 @@ pub fn render_people_stats(
     mut commands: Commands,
 ) {
     Window::new("People").show(egui_context.ctx_mut(), |ui| {
+        let total_money = people
+            .iter()
+            .map(|(_, _, wallet, _)| wallet.money())
+            .sum::<Money>();
+        ui.label(format!("Total people money: {}", total_money));
         let table = TableBuilder::new(ui)
             // .striped(self.striped)
             // .resizable(self.resizable)
@@ -84,7 +90,7 @@ pub fn render_people_stats(
                         entity,
                         pinned: pinned.get(entity).is_ok(),
                         name: name.to_string(),
-                        money: wallet.money,
+                        money: wallet.money(),
                         items: count_items(&person.assets.items),
                         items_text: items_to_string(&person.assets.items),
                         utility: person.utility,

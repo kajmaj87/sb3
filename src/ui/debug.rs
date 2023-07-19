@@ -8,8 +8,8 @@ use bevy_egui::egui::Window;
 use bevy_egui::{egui, EguiContexts};
 use egui_extras::{Column, TableBuilder};
 
-use crate::business::Wallet;
 use crate::money::Money;
+use crate::wallet::Wallet;
 
 #[derive(Resource)]
 pub struct Performance {
@@ -107,7 +107,7 @@ pub fn debug_window(
                 ui.label(format!("Entities: {}", entities.iter().count()));
                 ui.label(format!(
                     "Total Money: {}",
-                    wallets.iter().fold(Money(0), |acc, w| acc + w.money)
+                    wallets.iter().fold(Money(0), |acc, w| acc + w.money())
                 ));
                 ui.collapsing("Performance Stats", |ui| {
                     TableBuilder::new(ui)

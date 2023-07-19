@@ -4,18 +4,18 @@
     "input": {},
     "output": [
       "raw ore",
-      1
+      4
     ],
-    "workdays_needed": 2
+    "workdays_needed": 8
   },
   {
     "name": "Solar Energy Collection",
     "input": {},
     "output": [
       "energy",
-      20
+      15
     ],
-    "workdays_needed": 1
+    "workdays_needed": 3
   },
   {
     "name": "Gas Harvesting",
@@ -33,7 +33,7 @@
       "raw food",
       50
     ],
-    "workdays_needed": 1
+    "workdays_needed": 5
   },
   {
     "name": "Synthetic Fabric Production",
@@ -52,9 +52,9 @@
     },
     "output": [
       "refined metal",
-      1
+      4
     ],
-    "workdays_needed": 1
+    "workdays_needed": 4
   },
   {
     "name": "Exotic Gas Compression",
@@ -78,7 +78,7 @@
       "processed food",
       16
     ],
-    "workdays_needed": 1
+    "workdays_needed": 4
   },
   {
     "name": "Fabric Weaving",

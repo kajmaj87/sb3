@@ -12,9 +12,9 @@
     ],
     "production_cycle": "Ore Mining",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -31,9 +31,9 @@
     ],
     "production_cycle": "Solar Energy Collection",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -50,9 +50,9 @@
     ],
     "production_cycle": "Gas Harvesting",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -66,9 +66,9 @@
     ],
     "production_cycle": "Hydroponic Food Production",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -82,9 +82,9 @@
     ],
     "production_cycle": "Synthetic Fabric Production",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -101,9 +101,9 @@
     ],
     "production_cycle": "Ore Refinement",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -117,9 +117,9 @@
     ],
     "production_cycle": "Exotic Gas Compression",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -136,9 +136,9 @@
     ],
     "production_cycle": "Food Processing",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -152,9 +152,9 @@
     ],
     "production_cycle": "Fabric Weaving",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -171,9 +171,9 @@
     ],
     "production_cycle": "Processor Fabrication",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -190,9 +190,9 @@
     ],
     "production_cycle": "FutureWear Clothing Production",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -209,9 +209,9 @@
     ],
     "production_cycle": "Quantum Battery Production",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -228,9 +228,9 @@
     ],
     "production_cycle": "HoloScreen Fabrication",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -247,9 +247,9 @@
     ],
     "production_cycle": "FutureWear Clothing Production",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -281,9 +281,9 @@
     ],
     "production_cycle": "Spaceship Construction",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -300,9 +300,9 @@
     ],
     "production_cycle": "Space Station Assembly",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -322,9 +322,9 @@
     ],
     "production_cycle": "SmartAppliances Production",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -344,9 +344,9 @@
     ],
     "production_cycle": "Hydroponic HomeKit Production",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -360,9 +360,9 @@
     ],
     "production_cycle": "Interstellar Portal Construction",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -388,9 +388,9 @@
     ],
     "production_cycle": "SmartHome Installation",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   },
@@ -410,9 +410,9 @@
     ],
     "production_cycle": "Luxury Space Cruise Ticket",
     "sell_strategy": {
-      "margin_drop_per_day": 0.1,
-      "current_margin": 2.0,
-      "min_margin": 0.5
+      "max_margin_change_per_day": 0.05,
+      "current_margin": 1.1,
+      "target_output_cycles": 50
     },
     "copies": 1
   }

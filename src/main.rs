@@ -24,6 +24,7 @@ mod people;
 mod stats;
 mod ui;
 mod user_input;
+mod wallet;
 
 #[derive(Deserialize, Resource, Debug)]
 pub struct BuildInfo {
@@ -84,9 +85,11 @@ fn main() {
                 business::order_expiration,
                 business::salary_payout,
                 business::execute_orders,
-                business::process_transactions,
+                // business::process_transactions,
                 business::produce,
                 (business::create_buy_orders, business::create_sell_orders), // those run in parallel
+                business::fire_stuff,
+                business::update_sell_strategy_margin,
                 business::update_sell_order_prices,
                 people::consume,
                 people::create_buy_orders_for_people,

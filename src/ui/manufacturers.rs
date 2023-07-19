@@ -8,19 +8,20 @@ use egui_extras::{Column, TableBuilder};
 
 use macros::measured;
 
-use crate::business::{BuyOrder, ItemType, Manufacturer, SellOrder, Wallet, Worker};
+use crate::business::{BuyOrder, ItemType, Manufacturer, SellOrder, SellStrategy, Worker};
 use crate::logs::Pinned;
 use crate::money::Money;
 use crate::stats::PriceHistory;
 use crate::ui::debug::Performance;
 use crate::ui::main_layout::UiState;
 use crate::ui::utilities::{count_items, items_to_string, label_with_hover_text};
+use crate::wallet::Wallet;
 
 #[allow(clippy::too_many_arguments)]
 #[measured]
 pub fn render_manufacturers_stats(
     mut egui_context: EguiContexts,
-    manufacturers: Query<(Entity, &Name, &Wallet, &Manufacturer)>,
+    manufacturers: Query<(Entity, &Name, &Wallet, &Manufacturer, &SellStrategy)>,
     sell_orders: Query<&SellOrder>,
     buy_orders: Query<&BuyOrder>,
     names: Query<&Name>,
@@ -32,10 +33,16 @@ pub fn render_manufacturers_stats(
 ) {
     Window::new("Manufacturers").show(egui_context.ctx_mut(), |ui| {
         let mut owner_counts: HashMap<Entity, usize> = HashMap::new();
+        let total_money = manufacturers
+            .iter()
+            .map(|(_, _, wallet, _, _)| wallet.money())
+            .sum::<Money>();
 
         for order in sell_orders.iter() {
             *owner_counts.entry(order.seller).or_insert(0) += 1;
         }
+        ui.label(format!("Total manufactuters money: {}", total_money));
+
         let table = TableBuilder::new(ui)
             // .striped(self.striped)
             // .resizable(self.resizable)
@@ -44,6 +51,7 @@ pub fn render_manufacturers_stats(
             .column(Column::auto())
             .column(Column::auto())
             .column(Column::initial(80.0).range(80.0..=200.0))
+            .column(Column::auto())
             .column(Column::auto())
             .column(Column::auto())
             .column(Column::auto())
@@ -98,6 +106,11 @@ pub fn render_manufacturers_stats(
                         ui_state.manufacturers = ManufacturerSort::BuyOrders;
                     }
                 });
+                header.col(|ui| {
+                    if ui.button("Margin").clicked() {
+                        ui_state.manufacturers = ManufacturerSort::CurrentMargin;
+                    }
+                });
             })
             .body(|mut body| {
                 let buy_order_by_type: HashMap<ItemType, usize> = buy_orders
@@ -121,48 +134,51 @@ pub fn render_manufacturers_stats(
                 });
                 let mut rows = manufacturers
                     .iter()
-                    .map(|(entity, name, wallet, manufacturer)| ManufacturerRow {
-                        entity,
-                        pinned: pins.get(entity).is_ok(),
-                        name: name.to_string(),
-                        production: manufacturer.production_cycle.output.0.name.to_string(),
-                        production_text: format!("{}", manufacturer.production_cycle),
-                        money: wallet.money,
-                        workers: manufacturer.hired_workers.len(),
-                        workers_text: manufacturer
-                            .hired_workers
-                            .iter()
-                            .map(|x| {
-                                format!(
-                                    "{} ({})",
-                                    names.get(*x).unwrap(),
-                                    workers.get(*x).unwrap().salary
-                                )
-                            })
-                            .collect::<Vec<String>>()
-                            .join("\n"),
-                        items: count_items(&manufacturer.assets.items),
-                        items_text: items_to_string(&manufacturer.assets.items),
-                        items_to_sell: manufacturer.assets.items_to_sell.len(),
-                        on_market: *owner_counts.get(&entity).unwrap_or(&0),
-                        on_market_text: price_history
-                            .prices
-                            .get(&manufacturer.production_cycle.output.0)
-                            .and_then(|x| x.last())
-                            .map_or_else(
-                                || "".to_string(),
-                                |price_stats| format!("{}", price_stats),
-                            ),
-                        buy_orders: *buy_order_by_type
-                            .get(&manufacturer.production_cycle.output.0)
-                            .unwrap_or(&0),
-                        buy_orders_text: buy_order_vec
-                            .iter()
-                            .filter(|x| x.0 .0 == manufacturer.production_cycle.output.0)
-                            .map(|x| format!("{}: {}", x.0 .1, x.1))
-                            .collect::<Vec<_>>()
-                            .join("\n"),
-                    })
+                    .map(
+                        |(entity, name, wallet, manufacturer, sell_strategy)| ManufacturerRow {
+                            entity,
+                            pinned: pins.get(entity).is_ok(),
+                            name: name.to_string(),
+                            production: manufacturer.production_cycle.output.0.name.to_string(),
+                            production_text: format!("{}", manufacturer.production_cycle),
+                            money: wallet.money(),
+                            workers: manufacturer.hired_workers.len(),
+                            workers_text: manufacturer
+                                .hired_workers
+                                .iter()
+                                .map(|x| {
+                                    format!(
+                                        "{} ({})",
+                                        names.get(*x).unwrap(),
+                                        workers.get(*x).unwrap().salary
+                                    )
+                                })
+                                .collect::<Vec<String>>()
+                                .join("\n"),
+                            items: count_items(&manufacturer.assets.items),
+                            items_text: items_to_string(&manufacturer.assets.items),
+                            items_to_sell: manufacturer.assets.items_to_sell.len(),
+                            on_market: *owner_counts.get(&entity).unwrap_or(&0),
+                            on_market_text: price_history
+                                .prices
+                                .get(&manufacturer.production_cycle.output.0)
+                                .and_then(|x| x.last())
+                                .map_or_else(
+                                    || "".to_string(),
+                                    |price_stats| format!("{}", price_stats),
+                                ),
+                            buy_orders: *buy_order_by_type
+                                .get(&manufacturer.production_cycle.output.0)
+                                .unwrap_or(&0),
+                            buy_orders_text: buy_order_vec
+                                .iter()
+                                .filter(|x| x.0 .0 == manufacturer.production_cycle.output.0)
+                                .map(|x| format!("{}: {}", x.0 .1, x.1))
+                                .collect::<Vec<_>>()
+                                .join("\n"),
+                            current_margin: sell_strategy.current_margin,
+                        },
+                    )
                     .collect::<Vec<_>>();
                 match ui_state.manufacturers {
                     ManufacturerSort::Name => {
@@ -189,6 +205,8 @@ pub fn render_manufacturers_stats(
                     ManufacturerSort::BuyOrders => {
                         rows.sort_by(|a, b| b.buy_orders.partial_cmp(&a.buy_orders).unwrap())
                     }
+                    ManufacturerSort::CurrentMargin => rows
+                        .sort_by(|a, b| b.current_margin.partial_cmp(&a.current_margin).unwrap()),
                 }
 
                 for r in rows
@@ -233,6 +251,9 @@ pub fn render_manufacturers_stats(
                         row.col(|ui| {
                             label_with_hover_text(ui, r.buy_orders, &r.buy_orders_text);
                         });
+                        row.col(|ui| {
+                            ui.label(format!("{:.1}%", 100.0 * (&r.current_margin - 1.0)));
+                        });
                     });
                 }
             });
@@ -248,6 +269,7 @@ pub enum ManufacturerSort {
     OnMarket,
     BuyOrders,
     Production,
+    CurrentMargin,
 }
 
 struct ManufacturerRow {
@@ -266,4 +288,5 @@ struct ManufacturerRow {
     buy_orders_text: String,
     production_text: String,
     workers_text: String,
+    current_margin: f32,
 }

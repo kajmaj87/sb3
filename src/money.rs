@@ -6,7 +6,7 @@ use std::str::FromStr;
 use serde::de::Error as DeError;
 use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Serialize, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Deserialize, Serialize, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Default)]
 pub struct Money(pub u64);
 
 impl Add for Money {
@@ -45,6 +45,22 @@ impl Mul<f32> for Money {
     }
 }
 
+impl Mul<u32> for Money {
+    type Output = Self;
+
+    fn mul(self, rhs: u32) -> Self::Output {
+        Self(self.0 * rhs as u64)
+    }
+}
+
+impl Div<u32> for Money {
+    type Output = Self;
+
+    fn div(self, rhs: u32) -> Self::Output {
+        Self(self.0 / rhs as u64)
+    }
+}
+
 impl Div<u64> for Money {
     type Output = Self;
 
@@ -71,6 +87,16 @@ impl<'a> Sum<&'a Money> for Money {
     fn sum<I>(iter: I) -> Self
     where
         I: Iterator<Item = &'a Money>,
+    {
+        let sum = iter.fold(0u64, |acc, m| acc + m.0);
+        Money(sum)
+    }
+}
+
+impl Sum for Money {
+    fn sum<I>(iter: I) -> Self
+    where
+        I: Iterator<Item = Money>,
     {
         let sum = iter.fold(0u64, |acc, m| acc + m.0);
         Money(sum)
