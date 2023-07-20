@@ -1,3 +1,4 @@
+use either::Either;
 use std::fmt;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
@@ -202,3 +203,11 @@ where
 
     deserializer.deserialize_any(MoneyVisitor)
 }
+
+/// A type alias to represent financial change in terms of cost (outgoing money)
+/// or gain (incoming money). Costs are represented as `Either::Left` and gains
+/// as `Either::Right`.
+///
+/// This can be used to succinctly express the effect of financial transactions
+/// on a `Wallet`.
+pub type MoneyChange = Either<Money, Money>;

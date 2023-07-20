@@ -10,12 +10,13 @@ use macros::measured;
 
 use crate::business::{BuyOrder, ItemType, Manufacturer, SellOrder, SellStrategy, Worker};
 use crate::logs::Pinned;
-use crate::money::Money;
+use crate::money::{Money, MoneyChange};
 use crate::stats::PriceHistory;
 use crate::ui::debug::Performance;
 use crate::ui::main_layout::UiState;
 use crate::ui::utilities::{count_items, items_to_string, label_with_hover_text};
 use crate::wallet::Wallet;
+use crate::Days;
 
 #[allow(clippy::too_many_arguments)]
 #[measured]
@@ -30,6 +31,7 @@ pub fn render_manufacturers_stats(
     mut ui_state: ResMut<UiState>,
     price_history: Res<PriceHistory>,
     mut commands: Commands,
+    date: Res<Days>,
 ) {
     Window::new("Manufacturers").show(egui_context.ctx_mut(), |ui| {
         let mut owner_counts: HashMap<Entity, usize> = HashMap::new();
@@ -51,6 +53,7 @@ pub fn render_manufacturers_stats(
             .column(Column::auto())
             .column(Column::auto())
             .column(Column::initial(80.0).range(80.0..=200.0))
+            .column(Column::auto())
             .column(Column::auto())
             .column(Column::auto())
             .column(Column::auto())
@@ -111,6 +114,9 @@ pub fn render_manufacturers_stats(
                         ui_state.manufacturers = ManufacturerSort::CurrentMargin;
                     }
                 });
+                header.col(|ui| {
+                    let _ = ui.button("Change");
+                });
             })
             .body(|mut body| {
                 let buy_order_by_type: HashMap<ItemType, usize> = buy_orders
@@ -142,12 +148,7 @@ pub fn render_manufacturers_stats(
                             production: manufacturer.production_cycle.output.0.name.to_string(),
                             production_text: format!("{}", manufacturer.production_cycle),
                             money: wallet.money(),
-                            money_text: wallet
-                                .transactions
-                                .iter()
-                                .map(|t| t.to_string())
-                                .collect::<Vec<String>>()
-                                .join("\n"),
+                            money_text: wallet.get_summary(date.days, 30, 30),
                             workers: manufacturer.hired_workers.len(),
                             workers_text: manufacturer
                                 .hired_workers
@@ -183,6 +184,7 @@ pub fn render_manufacturers_stats(
                                 .collect::<Vec<_>>()
                                 .join("\n"),
                             current_margin: sell_strategy.current_margin,
+                            change: wallet.calculate_total_change(date.days, 30),
                         },
                     )
                     .collect::<Vec<_>>();
@@ -260,6 +262,14 @@ pub fn render_manufacturers_stats(
                         row.col(|ui| {
                             ui.label(format!("{:.1}%", 100.0 * (&r.current_margin - 1.0)));
                         });
+                        row.col(|ui| match r.change {
+                            MoneyChange::Right(change) => {
+                                ui.label(change.to_string());
+                            }
+                            MoneyChange::Left(change) => {
+                                ui.label(format!("-{}", change));
+                            }
+                        });
                     });
                 }
             });
@@ -296,4 +306,5 @@ struct ManufacturerRow {
     production_text: String,
     workers_text: String,
     current_margin: f32,
+    change: MoneyChange,
 }

@@ -613,7 +613,7 @@ fn execute_order(
     logs: &mut EventWriter<LogEvent>,
     manufacturers: &mut Query<(Entity, &mut Manufacturer)>,
     people: &mut Query<(Entity, &mut Person)>,
-    _date: &Res<Days>,
+    date: &Res<Days>,
 ) -> Result<(), TransactionError> {
     let (sell_order_id, sell_order) = sell_order;
     let (buy_order_id, buy_order) = buy_order;
@@ -633,6 +633,7 @@ fn execute_order(
             item: sell_order.item,
             item_type: sell_order.item_type.clone(),
             price: sell_order.price,
+            date: date.days,
         },
         logs,
     )?;
@@ -720,22 +721,22 @@ pub fn salary_payout(
     mut workers: Query<(Entity, &mut Wallet, &Worker), Without<Manufacturer>>,
     mut manufacturers: Query<(Entity, &mut Wallet, &Manufacturer), Without<Worker>>,
     mut logs: EventWriter<LogEvent>,
+    date: Res<Days>,
 ) {
     for (employer, mut manufacturer_wallet, manufacturer) in manufacturers.iter_mut() {
         for worker in manufacturer.hired_workers.iter() {
             if let Ok((worker, mut worker_wallet, worker_data)) = workers.get_mut(*worker) {
-                manufacturer_wallet
-                    .transaction(
-                        &mut worker_wallet,
-                        &Transaction::Salary {
-                            side: TradeSide::Pay,
-                            employer,
-                            worker,
-                            salary: worker_data.salary,
-                        },
-                        &mut logs,
-                    )
-                    .unwrap();
+                let _ = manufacturer_wallet.transaction(
+                    &mut worker_wallet,
+                    &Transaction::Salary {
+                        side: TradeSide::Pay,
+                        employer,
+                        worker,
+                        salary: worker_data.salary,
+                        date: date.days,
+                    },
+                    &mut logs,
+                );
             }
         }
     }

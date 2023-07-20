@@ -1,5 +1,5 @@
 use bevy::core::Name;
-use bevy::prelude::{Commands, Entity, Query, ResMut};
+use bevy::prelude::{Commands, Entity, Query, Res, ResMut};
 use bevy_egui::egui::{Align, Layout, Window};
 use bevy_egui::EguiContexts;
 use egui_extras::{Column, TableBuilder};
@@ -14,6 +14,7 @@ use crate::ui::debug::Performance;
 use crate::ui::main_layout::UiState;
 use crate::ui::utilities::{count_items, items_to_string, label_with_hover_text};
 use crate::wallet::Wallet;
+use crate::Days;
 
 #[allow(clippy::too_many_arguments)]
 #[measured]
@@ -25,6 +26,7 @@ pub fn render_people_stats(
     mut ui_state: ResMut<UiState>,
     pinned: Query<&Pinned>,
     mut commands: Commands,
+    date: Res<Days>,
 ) {
     Window::new("People").show(egui_context.ctx_mut(), |ui| {
         let total_money = people
@@ -91,12 +93,7 @@ pub fn render_people_stats(
                         pinned: pinned.get(entity).is_ok(),
                         name: name.to_string(),
                         money: wallet.money(),
-                        money_text: wallet
-                            .transactions
-                            .iter()
-                            .map(|t| t.to_string())
-                            .collect::<Vec<String>>()
-                            .join("\n"),
+                        money_text: wallet.get_summary(date.days, 30, 30),
                         items: count_items(&person.assets.items),
                         items_text: items_to_string(&person.assets.items),
                         utility: person.utility,
