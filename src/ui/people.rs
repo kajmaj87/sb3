@@ -105,10 +105,10 @@ pub fn render_people_stats(
                                         .get(employer)
                                         .map(|(_, name, _)| name.to_string())
                                 } else {
-                                    Ok("not yet filled".to_string())
+                                    Ok("<<UNEMPLOYED>>".to_string())
                                 }
                             })
-                            .unwrap_or_else(|_| "not yet filled".to_string()),
+                            .unwrap_or_else(|_| "<<UNEMPLOYED>>".to_string()),
                         salary: workers.get(entity).map(|w| w.salary).unwrap_or(Money(0)),
                     })
                     .collect::<Vec<_>>();

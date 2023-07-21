@@ -450,6 +450,7 @@ pub fn fire_stuff(
     mut manufacturers: Query<(Entity, &Wallet, &mut Manufacturer, &SellStrategy)>,
     mut workers: Query<(Entity, &Name, &mut Worker)>,
     mut logs: EventWriter<LogEvent>,
+    mut commands: Commands,
 ) {
     for (manufacturer, wallet, mut manufacturer_data, sell_strategy) in manufacturers.iter_mut() {
         if manufacturer_data.delay_to_fire_next_worker == 0
@@ -464,6 +465,7 @@ pub fn fire_stuff(
                     text: format!("I fired a worker {}!", name),
                     entity: manufacturer,
                 });
+                commands.entity(worker).remove::<Worker>();
             }
         } else if manufacturer_data.delay_to_fire_next_worker > 0 {
             manufacturer_data.delay_to_fire_next_worker -= 1;
@@ -485,6 +487,7 @@ pub fn fire_stuff(
                     ),
                     entity: manufacturer,
                 });
+                commands.entity(worker).remove::<Worker>();
             }
         }
     }
@@ -769,6 +772,19 @@ pub fn order_expiration(mut buy_orders: Query<(Entity, &mut BuyOrder)>, mut comm
                 commands.entity(buy_order_id).despawn();
             } else {
                 buy_order.expiration = Some(expiration - 1);
+            }
+        }
+    }
+}
+
+pub fn assing_workers_to_businesses(
+    mut workers: Query<(Entity, &mut Worker, &Person)>,
+    manufacturers: Query<(Entity, &Manufacturer)>,
+) {
+    for (manufacturer_entity, manufacturer) in manufacturers.iter() {
+        for (worker_entity, mut worker, _) in workers.iter_mut() {
+            if manufacturer.hired_workers.contains(&worker_entity) {
+                worker.employed_at = Some(manufacturer_entity);
             }
         }
     }

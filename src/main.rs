@@ -89,6 +89,7 @@ fn main() {
                 business::produce,
                 (business::create_buy_orders, business::create_sell_orders), // those run in parallel
                 business::fire_stuff,
+                business::assing_workers_to_businesses,
                 business::update_sell_strategy_margin,
                 business::update_sell_order_prices,
                 people::consume,
