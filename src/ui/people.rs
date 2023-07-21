@@ -34,6 +34,11 @@ pub fn render_people_stats(
             .map(|(_, _, wallet, _)| wallet.money())
             .sum::<Money>();
         ui.label(format!("Total people money: {}", total_money));
+        let employment = workers.iter().count() as f32 / people.iter().count() as f32;
+        ui.label(format!(
+            "Unemployment rate: {:.2}%",
+            (1.0 - employment) * 100.0
+        ));
         let table = TableBuilder::new(ui)
             // .striped(self.striped)
             // .resizable(self.resizable)
