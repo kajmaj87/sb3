@@ -110,12 +110,14 @@ pub fn render_manufacturers_stats(
                     }
                 });
                 header.col(|ui| {
-                    if ui.button("Margin").clicked() {
-                        ui_state.manufacturers = ManufacturerSort::CurrentMargin;
+                    if ui.button("Price").clicked() {
+                        ui_state.manufacturers = ManufacturerSort::CurrentPrice;
                     }
                 });
                 header.col(|ui| {
-                    let _ = ui.button("Change");
+                    if ui.button("Change").clicked() {
+                        ui_state.manufacturers = ManufacturerSort::Change;
+                    }
                 });
             })
             .body(|mut body| {
@@ -157,7 +159,7 @@ pub fn render_manufacturers_stats(
                                     format!(
                                         "{} ({})",
                                         names.get(*x).unwrap(),
-                                        workers.get(*x).unwrap().salary
+                                        workers.get(*x).map_or(Money(0), |w| w.salary)
                                     )
                                 })
                                 .collect::<Vec<String>>()
@@ -213,8 +215,11 @@ pub fn render_manufacturers_stats(
                     ManufacturerSort::BuyOrders => {
                         rows.sort_by(|a, b| b.buy_orders.partial_cmp(&a.buy_orders).unwrap())
                     }
-                    ManufacturerSort::CurrentMargin => {
+                    ManufacturerSort::CurrentPrice => {
                         rows.sort_by(|a, b| b.current_price.partial_cmp(&a.current_price).unwrap())
+                    }
+                    ManufacturerSort::Change => {
+                        rows.sort_by(|a, b| b.change.partial_cmp(&a.change).unwrap())
                     }
                 }
 
@@ -286,7 +291,8 @@ pub enum ManufacturerSort {
     OnMarket,
     BuyOrders,
     Production,
-    CurrentMargin,
+    CurrentPrice,
+    Change,
 }
 
 struct ManufacturerRow {

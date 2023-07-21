@@ -149,6 +149,12 @@ pub struct BuyOrder {
     pub(crate) expiration: Option<u64>,
 }
 
+#[derive(Component, Debug, Clone)]
+pub struct JobOffer {
+    pub salary: Money,
+    pub employer: Entity,
+}
+
 #[derive(Component, Clone)]
 pub struct BuyStrategy {
     pub(crate) target_production_cycles: u32,
@@ -430,25 +436,53 @@ pub fn update_sell_strategy_margin(
     }
 }
 
-// pub fn hire_stuff(
-//     mut manufacturers: Query<(Entity, &Wallet, &mut Manufacturer, &SellStrategy)>,
-//     buy_orders: Query<&BuyOrder>,
-// ) {
-//     buy_orders.iter().map(|buy_order| {
-//         let seller = buy_order.seller;
-//         let item = buy_order.item_type;
-//         (seller, item)
-//     })
-//     for (manufacturer, wallet, mut manufacturer_data, sell_strategy) in manufacturers.iter_mut() {
-//         if manufacturer_data.hired_workers.len() < manufacturer_data.production_cycle.workdays_needed as usize &&  {
-//
-//         }
-//     }
-// }
+pub fn hire_stuff(
+    mut manufacturers: Query<(Entity, &mut Manufacturer, &SellStrategy)>,
+    jobs: Query<&JobOffer>,
+    mut commands: Commands,
+) {
+    for (manufacturer, manufacturer_data, sell_strategy) in manufacturers.iter_mut() {
+        let total_offers = jobs
+            .iter()
+            .filter(|job| job.employer == manufacturer)
+            .count();
+        if manufacturer_data.hired_workers.len()
+            < manufacturer_data.production_cycle.workdays_needed as usize
+            && sell_strategy.current_price > sell_strategy.base_price * 2
+            && total_offers == 0
+        {
+            commands.spawn(JobOffer {
+                salary: Money(500),
+                employer: manufacturer,
+            });
+        }
+    }
+}
+
+pub fn take_job_offers(
+    jobs: Query<(Entity, &JobOffer)>,
+    unemployed: Query<(Entity, &Person), Without<Worker>>,
+    mut manufacturers: Query<&mut Manufacturer>,
+    mut commands: Commands,
+) {
+    for (job, offer) in jobs.iter() {
+        for (person, _) in unemployed.iter() {
+            if let Ok(mut manufacturer) = manufacturers.get_mut(offer.employer) {
+                manufacturer.hired_workers.push(person);
+                commands.entity(person).insert(Worker {
+                    salary: offer.salary,
+                    employed_at: Some(offer.employer),
+                });
+                commands.entity(job).despawn();
+            }
+        }
+    }
+}
 
 pub fn fire_stuff(
     mut manufacturers: Query<(Entity, &Wallet, &mut Manufacturer, &SellStrategy)>,
-    mut workers: Query<(Entity, &Name, &mut Worker)>,
+    workers: Query<(Entity, &mut Worker)>,
+    names: Query<&Name>,
     mut logs: EventWriter<LogEvent>,
     mut commands: Commands,
 ) {
@@ -459,7 +493,7 @@ pub fn fire_stuff(
         {
             let worker = manufacturer_data.hired_workers.pop();
             if let Some(worker) = worker {
-                let (_, name, _) = workers.get_mut(worker).unwrap();
+                let name = names.get(worker).unwrap();
                 manufacturer_data.delay_to_fire_next_worker = 30;
                 logs.send(LogEvent::Generic {
                     text: format!("I fired a worker {}!", name),
@@ -474,12 +508,16 @@ pub fn fire_stuff(
             < manufacturer_data
                 .hired_workers
                 .iter()
-                .map(|&worker| workers.get(worker).unwrap().2.salary)
+                .map(|&worker| {
+                    workers
+                        .get(worker)
+                        .map_or(Money(0), |(_, worker)| worker.salary)
+                })
                 .sum::<Money>()
         {
             let worker = manufacturer_data.hired_workers.pop();
             if let Some(worker) = worker {
-                let (_, name, _) = workers.get_mut(worker).unwrap();
+                let name = names.get(worker).unwrap();
                 logs.send(LogEvent::Generic {
                     text: format!(
                         "I fired a worker {} because I can't afford to pay him!",
