@@ -1,7 +1,7 @@
 use either::Either;
 use std::fmt;
 use std::iter::Sum;
-use std::ops::{Add, AddAssign, Div, Mul, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Sub, SubAssign};
 use std::str::FromStr;
 
 use serde::de::Error as DeError;
@@ -35,6 +35,12 @@ impl AddAssign for Money {
 impl SubAssign for Money {
     fn sub_assign(&mut self, other: Self) {
         self.0 -= other.0;
+    }
+}
+
+impl MulAssign<f32> for Money {
+    fn mul_assign(&mut self, rhs: f32) {
+        self.0 = (self.0 as f32 * rhs).round() as u64;
     }
 }
 

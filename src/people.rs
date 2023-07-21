@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use bevy::prelude::*;
 use rand::distributions::{Distribution, WeightedIndex};
-use rand::prelude::SliceRandom;
+use rand::prelude::{SliceRandom, ThreadRng};
 use rand::Rng;
 use serde::{Deserialize, Deserializer};
 
@@ -183,70 +183,106 @@ pub fn create_buy_orders_for_people(
 ) {
     let mut rng = rand::thread_rng();
     for (buyer, name, _, mut person) in people.iter_mut() {
-        let total_assets = calculate_total_items(&person.assets);
-        let mut person_marginal_utilities: HashMap<ItemType, f64> = HashMap::new();
-        for need in needs.needs.iter().flat_map(|(_, n)| n.satisfied_by.keys()) {
-            let util = marginal_utility(&needs, name, &total_assets, &price_history, need);
-            person_marginal_utilities.insert(need.clone(), util);
-        }
-        person.utility = utility(&needs, name, &total_assets, &price_history);
-        if let Some(money_utility) =
-            calculate_money_utility(&person_marginal_utilities, &price_history)
-        {
-            debug!("Money utility for {} is {}", name, money_utility);
-            let utilities_with_prices = calculate_marginal_utilities_adjusted_by_prices(
-                &person_marginal_utilities,
+        let mut total_assets = calculate_total_items(&person.assets);
+        let mut item_buy_success_count = 0;
+
+        while item_buy_success_count < 5 {
+            match try_to_buy_item(
+                &needs,
                 &price_history,
-                money_utility,
-            );
-            // info!("Utilities without prices for {} are:\n {:#?}", name, person_marginal_utilities);
-            debug!(
-                "Utilities with prices for {} are:\n {:#?}",
-                name, utilities_with_prices
-            );
-            // Sort by utility
-            let mut utilities: Vec<(&ItemType, &f64)> = utilities_with_prices.iter().collect();
-            utilities.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap());
-
-            // Convert utilities to weights
-            let weights: Vec<f64> = utilities.iter().map(|(_, util)| **util).collect();
-
-            // Create a WeightedIndex distribution
-            let dist = WeightedIndex::new(&weights);
-            if dist.is_err() {
-                logs.send(LogEvent::Generic {
-                    text: "There is no item I can buy!".to_string(),
-                    entity: buyer,
-                });
-                continue;
-            }
-
-            // Sample from it
-            let index = dist.unwrap().sample(&mut rng);
-
-            // Get the corresponding item
-            let (item_type, _util) = utilities[index];
-
-            trace!("Chosen item for person {} is {}", name, item_type.name);
-            let buy_order = BuyOrder {
-                item_type: item_type.clone(),
+                &mut logs,
+                &mut commands,
+                &mut rng,
                 buyer,
-                order: OrderType::Market, // Always buying at market price
-                expiration: Some(10),
-            };
-            logs.send(LogEvent::Generic {
-                text: format!(
-                    "{}: I'll try to buy {} at market price",
-                    name, item_type.name
-                ),
-                entity: buyer,
-            });
-            commands.spawn((
-                buy_order.clone(),
-                Name::new(format!("Consumer {} buy order @Market", item_type.name)),
-            ));
+                name,
+                &mut person,
+                &total_assets,
+            ) {
+                Some(item) => {
+                    *total_assets.entry(item).or_insert(0) += 1;
+                    item_buy_success_count += 1;
+                }
+                None => break,
+            }
         }
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn try_to_buy_item(
+    needs: &Res<Needs>,
+    price_history: &Res<PriceHistory>,
+    logs: &mut EventWriter<LogEvent>,
+    commands: &mut Commands,
+    mut rng: &mut ThreadRng,
+    buyer: Entity,
+    name: &Name,
+    person: &mut Mut<Person>,
+    total_assets: &HashMap<ItemType, u64>,
+) -> Option<ItemType> {
+    let mut person_marginal_utilities: HashMap<ItemType, f64> = HashMap::new();
+    for need in needs.needs.iter().flat_map(|(_, n)| n.satisfied_by.keys()) {
+        let util = marginal_utility(needs, name, total_assets, price_history, need);
+        person_marginal_utilities.insert(need.clone(), util);
+    }
+    person.utility = utility(needs, name, total_assets, price_history);
+    if let Some(money_utility) = calculate_money_utility(&person_marginal_utilities, price_history)
+    {
+        debug!("Money utility for {} is {}", name, money_utility);
+        let utilities_with_prices = calculate_marginal_utilities_adjusted_by_prices(
+            &person_marginal_utilities,
+            price_history,
+            money_utility,
+        );
+        // info!("Utilities without prices for {} are:\n {:#?}", name, person_marginal_utilities);
+        debug!(
+            "Utilities with prices for {} are:\n {:#?}",
+            name, utilities_with_prices
+        );
+        // Sort by utility
+        let mut utilities: Vec<(&ItemType, &f64)> = utilities_with_prices.iter().collect();
+        utilities.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap());
+
+        // Convert utilities to weights
+        let weights: Vec<f64> = utilities.iter().map(|(_, util)| **util).collect();
+
+        // Create a WeightedIndex distribution
+        let dist = WeightedIndex::new(weights);
+        if dist.is_err() {
+            logs.send(LogEvent::Generic {
+                text: "There is no item I can buy!".to_string(),
+                entity: buyer,
+            });
+            return None;
+        }
+
+        // Sample from it
+        let index = dist.unwrap().sample(&mut rng);
+
+        // Get the corresponding item
+        let (item_type, _util) = utilities[index];
+
+        trace!("Chosen item for person {} is {}", name, item_type.name);
+        let buy_order = BuyOrder {
+            item_type: item_type.clone(),
+            buyer,
+            order: OrderType::Market, // Always buying at market price
+            expiration: Some(10),
+        };
+        logs.send(LogEvent::Generic {
+            text: format!(
+                "{}: I'll try to buy {} at market price",
+                name, item_type.name
+            ),
+            entity: buyer,
+        });
+        commands.spawn((
+            buy_order.clone(),
+            Name::new(format!("Consumer {} buy order @Market", item_type.name)),
+        ));
+        return Some(item_type.clone());
+    }
+    None
 }
 
 fn calculate_marginal_utilities_adjusted_by_prices(

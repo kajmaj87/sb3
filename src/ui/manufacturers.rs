@@ -183,7 +183,7 @@ pub fn render_manufacturers_stats(
                                 .map(|x| format!("{}: {}", x.0 .1, x.1))
                                 .collect::<Vec<_>>()
                                 .join("\n"),
-                            current_margin: sell_strategy.current_margin,
+                            current_price: sell_strategy.current_price,
                             change: wallet.calculate_total_change(date.days, 30),
                         },
                     )
@@ -213,8 +213,9 @@ pub fn render_manufacturers_stats(
                     ManufacturerSort::BuyOrders => {
                         rows.sort_by(|a, b| b.buy_orders.partial_cmp(&a.buy_orders).unwrap())
                     }
-                    ManufacturerSort::CurrentMargin => rows
-                        .sort_by(|a, b| b.current_margin.partial_cmp(&a.current_margin).unwrap()),
+                    ManufacturerSort::CurrentMargin => {
+                        rows.sort_by(|a, b| b.current_price.partial_cmp(&a.current_price).unwrap())
+                    }
                 }
 
                 for r in rows
@@ -260,7 +261,7 @@ pub fn render_manufacturers_stats(
                             label_with_hover_text(ui, r.buy_orders, &r.buy_orders_text);
                         });
                         row.col(|ui| {
-                            ui.label(format!("{:.1}%", 100.0 * (&r.current_margin - 1.0)));
+                            ui.label(&r.current_price.to_string());
                         });
                         row.col(|ui| match r.change {
                             MoneyChange::Right(change) => {
@@ -305,6 +306,6 @@ struct ManufacturerRow {
     buy_orders_text: String,
     production_text: String,
     workers_text: String,
-    current_margin: f32,
+    current_price: Money,
     change: MoneyChange,
 }

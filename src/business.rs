@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::fmt::Display;
 
@@ -36,7 +36,7 @@ pub struct ProductionCycle {
     pub workdays_left: u32,
 }
 
-impl fmt::Display for ProductionCycle {
+impl Display for ProductionCycle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(f, "Production Cycle:\n")?;
         writeln!(f, "Input:")?;
@@ -61,7 +61,11 @@ pub struct ManufacturerBundle {
     pub manufacturer: Manufacturer,
     pub sell_strategy: SellStrategy,
     pub wallet: Wallet,
-    // pub transaction_log: TransactionLog,
+}
+
+#[derive(Debug)]
+pub struct ProductionLog {
+    date: usize,
 }
 
 #[derive(Component, Debug)]
@@ -70,6 +74,7 @@ pub struct Manufacturer {
     pub(crate) assets: Inventory,
     pub(crate) hired_workers: Vec<Entity>,
     pub(crate) delay_to_fire_next_worker: u32,
+    pub(crate) production_log: VecDeque<ProductionLog>,
 }
 
 #[derive(Component, Debug, Serialize, Deserialize, Copy, Clone)]
@@ -124,9 +129,11 @@ impl Ord for SellOrder {
 
 #[derive(Component, Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct SellStrategy {
-    pub(crate) max_margin_change_per_day: f32,
-    pub(crate) target_output_cycles: u32,
-    pub(crate) current_margin: f32,
+    pub(crate) max_price_change_per_day: f32,
+    #[serde(skip)]
+    pub(crate) current_price: Money,
+    #[serde(skip)]
+    pub(crate) base_price: Money,
 }
 
 #[derive(Debug, Clone)]
@@ -161,11 +168,18 @@ pub fn produce(
     mut manufacturers: Query<(&Wallet, &mut Manufacturer)>,
     mut commands: Commands,
     workers_query: Query<&Worker>,
+    date: Res<Days>,
 ) {
     for (wallet, mut manufacturer) in manufacturers.iter_mut() {
         // fill production cycle
         // produce_for_manufacturer(&mut b, commands, &production_cost);
-        execute_production_cycle(&mut commands, &mut manufacturer, wallet, &workers_query)
+        execute_production_cycle(
+            &mut commands,
+            &mut manufacturer,
+            wallet,
+            &workers_query,
+            &date,
+        )
     }
 }
 
@@ -174,6 +188,7 @@ fn execute_production_cycle(
     manufacturer: &mut Mut<Manufacturer>,
     wallet: &Wallet,
     workers_query: &Query<&Worker>,
+    date: &Res<Days>,
 ) {
     match work_on_cycle_possible(wallet, manufacturer, workers_query) {
         Ok(cost_per_day) => {
@@ -212,6 +227,9 @@ fn execute_production_cycle(
                         .spawn((item, Name::new(output_material.name.to_string())))
                         .id();
                     manufacturer.assets.items_to_sell.insert(output_item);
+                    manufacturer
+                        .production_log
+                        .push_front(ProductionLog { date: date.days });
                 }
                 manufacturer.production_cycle.workdays_left =
                     manufacturer.production_cycle.workdays_needed;
@@ -281,10 +299,10 @@ fn work_on_cycle_possible(
 #[measured]
 pub fn create_sell_orders(
     mut commands: Commands,
-    mut manufacturers: Query<(Entity, &mut Manufacturer, &SellStrategy)>,
+    mut manufacturers: Query<(Entity, &mut Manufacturer, &mut SellStrategy)>,
     items_query: Query<(&Name, &Item)>,
 ) {
-    for (seller, mut manufacturer, strategy) in manufacturers.iter_mut() {
+    for (seller, mut manufacturer, mut strategy) in manufacturers.iter_mut() {
         let mut items_to_sell = vec![];
         let amount_to_sell = (manufacturer.assets.items_to_sell.len()
             * manufacturer.hired_workers.len())
@@ -299,11 +317,15 @@ pub fn create_sell_orders(
         }
         for item in items_to_sell {
             if let Ok((name, item_cost)) = items_query.get(item) {
+                strategy.base_price = item_cost.production_cost;
+                if strategy.current_price == Money(0) {
+                    strategy.current_price = item_cost.production_cost;
+                }
                 let sell_order = SellOrder {
                     item,
                     item_type: item_cost.item_type.clone(),
                     seller,
-                    price: item_cost.production_cost * strategy.current_margin,
+                    price: strategy.current_price,
                     base_price: item_cost.production_cost,
                 };
                 debug!("Created sell order {:?} for {}", sell_order, name.as_str());
@@ -326,59 +348,103 @@ pub fn update_sell_order_prices(
 ) {
     for (_, name, mut sell_order) in sell_orders.iter_mut() {
         let sell_strategy = sell_strategies.get(sell_order.seller).unwrap();
-        sell_order.price = sell_order.base_price * sell_strategy.current_margin;
+        sell_order.price = sell_strategy.current_price;
         debug!(
             "Updated {} sell order price to {}",
             name.as_str(),
             sell_order.price
         );
-        if sell_strategy.current_margin < 1.0 {
+        if sell_strategy.current_price < sell_order.base_price {
             debug!("Oh my god, we're selling {} at a loss!", name.as_str());
         }
     }
 }
 
 pub fn update_sell_strategy_margin(
-    mut manufacturers: Query<(Entity, &mut SellStrategy, &Manufacturer)>,
-    sell_orders: Query<&SellOrder>,
+    mut manufacturers: Query<(Entity, &mut SellStrategy, &Wallet, &Manufacturer)>,
     mut logs: EventWriter<LogEvent>,
+    date: Res<Days>,
 ) {
-    // group sell orders by seller
-    let mut sell_orders_by_seller: HashMap<Entity, Vec<&SellOrder>> = HashMap::new();
-    for sell_order in sell_orders.iter() {
-        let seller = sell_order.seller;
-        if let Some(sell_orders) = sell_orders_by_seller.get_mut(&seller) {
-            sell_orders.push(sell_order);
-        } else {
-            sell_orders_by_seller.insert(seller, vec![sell_order]);
-        }
-    }
-    for (seller, mut sell_strategy, manufacturer) in manufacturers.iter_mut() {
-        let total_items = sell_orders_by_seller
-            .get(&seller)
-            .map_or(0, |sell_orders| sell_orders.len());
-        if total_items == 0 {
+    let days_to_look_at = 30;
+    for (seller, mut sell_strategy, wallet, manufacturer) in manufacturers.iter_mut() {
+        let sold_items = wallet.get_amount_of_sell_transactions(
+            date.days,
+            &manufacturer.production_cycle.output.0,
+            days_to_look_at,
+        );
+        let produced_items = manufacturer
+            .production_log
+            .iter()
+            .take_while(|log| date.days - log.date <= days_to_look_at)
+            .count();
+        logs.send(LogEvent::Generic {
+            text: format!(
+                "I'm thinking about my selling strategy, I've sold {} items and produced {} items.",
+                sold_items, produced_items
+            ),
+            entity: seller,
+        });
+        if produced_items == 0 {
             continue;
         }
-        let target_items =
-            sell_strategy.target_output_cycles * manufacturer.production_cycle.output.1;
-        let selling_ratio = total_items as f32 / target_items as f32;
-        if selling_ratio < 0.25 {
-            let change = (0.25 - selling_ratio) * sell_strategy.max_margin_change_per_day;
-            sell_strategy.current_margin +=
-                (0.25 - selling_ratio) * sell_strategy.max_margin_change_per_day;
-            logs.send(LogEvent::Generic { text: format!("I'm selling too fast! Time to increase margin to {:.1}% (ratio {:.1}, change {:.2}%)", 100.0 * (sell_strategy.current_margin - 1.0), selling_ratio, 100.0 * change), entity: seller });
-        } else if selling_ratio > 0.75 {
-            let change = (selling_ratio - 0.75).min(1.0) * sell_strategy.max_margin_change_per_day;
-            sell_strategy.current_margin -= change;
-            if sell_strategy.current_margin < 0.3 {
-                sell_strategy.current_margin = 0.3;
-            } else {
-                logs.send(LogEvent::Generic { text: format!("I'm selling too slow! Time to decrease margin to {:.1}% (ratio {:.1}, change: {:.2}%)", 100.0 * (sell_strategy.current_margin - 1.0), selling_ratio, 100.0 * change), entity: seller });
-            }
+        let lower_bound = 0.5;
+        let upper_bound = 0.9;
+        let selling_ratio = sold_items as f32 / produced_items as f32;
+        let change = if selling_ratio < lower_bound {
+            let change =
+                1.0 - (lower_bound - selling_ratio) * sell_strategy.max_price_change_per_day;
+            logs.send(LogEvent::Generic { text: format!("I'm selling too slow! Time to decrease price to {} (ratio {:.2}, change {:.2}%)", sell_strategy.current_price, selling_ratio, 100.0 * change), entity: seller });
+            change
+        } else if selling_ratio > upper_bound {
+            let change = 1.0
+                + (selling_ratio - upper_bound).min(1.0) * sell_strategy.max_price_change_per_day;
+            logs.send(LogEvent::Generic { text: format!("I'm selling too fast! Time to increase price to {} (ratio {:.2}, change {:.2}%)", sell_strategy.current_price, selling_ratio, 100.0 * change), entity: seller });
+            change
+            // sell_strategy.current_price -= change;
+            // if sell_strategy.current_price < 0.3 {
+            //     sell_strategy.current_price = 0.3;
+            // } else {
+            // }
+        } else {
+            logs.send(LogEvent::Generic {
+                text: format!(
+                    "I'm selling at a right price! {} (ratio {:.2}, change {:.2}%)",
+                    sell_strategy.current_price, selling_ratio, 100.0
+                ),
+                entity: seller,
+            });
+            1.0
+        };
+        let old_price = sell_strategy.current_price;
+        sell_strategy.current_price *= change;
+        // ensure there is at least a little change in price
+        if sell_strategy.current_price == old_price && change > 1.0 {
+            sell_strategy.current_price += Money(1);
+        }
+        if sell_strategy.current_price == old_price
+            && change < 1.0
+            && sell_strategy.current_price > Money(1)
+        {
+            sell_strategy.current_price -= Money(1);
         }
     }
 }
+
+// pub fn hire_stuff(
+//     mut manufacturers: Query<(Entity, &Wallet, &mut Manufacturer, &SellStrategy)>,
+//     buy_orders: Query<&BuyOrder>,
+// ) {
+//     buy_orders.iter().map(|buy_order| {
+//         let seller = buy_order.seller;
+//         let item = buy_order.item_type;
+//         (seller, item)
+//     })
+//     for (manufacturer, wallet, mut manufacturer_data, sell_strategy) in manufacturers.iter_mut() {
+//         if manufacturer_data.hired_workers.len() < manufacturer_data.production_cycle.workdays_needed as usize &&  {
+//
+//         }
+//     }
+// }
 
 pub fn fire_stuff(
     mut manufacturers: Query<(Entity, &Wallet, &mut Manufacturer, &SellStrategy)>,
@@ -387,7 +453,7 @@ pub fn fire_stuff(
 ) {
     for (manufacturer, wallet, mut manufacturer_data, sell_strategy) in manufacturers.iter_mut() {
         if manufacturer_data.delay_to_fire_next_worker == 0
-            && sell_strategy.current_margin < 0.8
+            && sell_strategy.current_price < sell_strategy.base_price * 0.8
             && manufacturer_data.hired_workers.len() > 1
         {
             let worker = manufacturer_data.hired_workers.pop();
@@ -669,53 +735,6 @@ fn execute_order(
     }
     Ok(())
 }
-
-// pub fn process_transactions(
-//     mut wallets: Query<&mut Wallet>,
-//     mut manufacturers: Query<(Entity, &mut Manufacturer)>,
-//     mut people: Query<(Entity, &mut Person)>,
-// ) {
-//     for wallet in wallets.iter_mut() {
-//         let mut unprocessed_transactions = wallet.transactions.iter().filter_map(|transaction| {
-//             if let Transaction::Trade { processed, .. } = transaction {
-//                 if !*processed {
-//                     Some(transaction)
-//                 } else {
-//                     None
-//                 }
-//             } else {
-//                 None
-//             }
-//         }).collect::<Vec<_>>();
-//         for transaction in unprocessed_transactions.iter() {
-//             match transaction {
-//                 Transaction::Trade => {
-//                     if let Ok((_, mut person)) = people.get_mut(transaction.buyer) {
-//                         person
-//                             .assets
-//                             .items
-//                             .entry(transaction.item_type.clone())
-//                             .or_default()
-//                             .push(transaction.item);
-//                     }
-//                     if let Ok((_, mut manufacturer)) = manufacturers.get_mut(transaction.buyer) {
-//                         manufacturer
-//                             .assets
-//                             .items
-//                             .entry(transaction.item_type.clone())
-//                             .or_default()
-//                             .push(transaction.item);
-//                     }
-//                 }
-//                 TransactionType::Sell => {
-//                     if let Ok((_, mut manufacturer)) = manufacturers.get_mut(transaction.seller) {
-//                         manufacturer.assets.items_to_sell.remove(&transaction.item);
-//                     }
-//                 }
-//             }
-//         }
-//     }
-// }
 
 pub fn salary_payout(
     mut workers: Query<(Entity, &mut Wallet, &Worker), Without<Manufacturer>>,

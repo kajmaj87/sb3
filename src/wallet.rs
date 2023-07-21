@@ -7,7 +7,7 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TradeSide {
     Pay,
     Receive,
@@ -429,5 +429,31 @@ impl Wallet {
         }
 
         summary
+    }
+
+    pub fn get_amount_of_sell_transactions(
+        &self,
+        current_date: usize,
+        item_type: &ItemType,
+        n: usize,
+    ) -> usize {
+        self.transactions
+            .iter()
+            .take_while(|transaction| current_date - transaction.get_date() <= n)
+            .filter_map(|transaction| match transaction {
+                Transaction::Trade {
+                    side,
+                    item_type: trade_item_type,
+                    ..
+                } => {
+                    if *side == TradeSide::Receive && *trade_item_type == *item_type {
+                        Some(())
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            })
+            .count()
     }
 }

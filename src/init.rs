@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::error::Error;
 use std::fs::File;
 use std::io::Read;
@@ -206,6 +206,7 @@ impl ManufacturerTemplate {
                     },
                     hired_workers: workers,
                     delay_to_fire_next_worker: 150,
+                    production_log: VecDeque::new(),
                 },
                 wallet: Wallet::new(self.money),
                 sell_strategy: self.sell_strategy,
