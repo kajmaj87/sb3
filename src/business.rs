@@ -191,6 +191,7 @@ pub enum MaxCycleError {
 pub fn produce(
     mut manufacturers: Query<(&Wallet, &mut Manufacturer)>,
     mut commands: Commands,
+    items: Query<&Item>,
     workers_query: Query<&Worker>,
     date: Res<Days>,
 ) {
@@ -201,6 +202,7 @@ pub fn produce(
             &mut commands,
             &mut manufacturer,
             wallet,
+            &items,
             &workers_query,
             &date,
         )
@@ -211,6 +213,7 @@ fn execute_production_cycle(
     commands: &mut Commands,
     manufacturer: &mut Mut<Manufacturer>,
     wallet: &Wallet,
+    items: &Query<&Item>,
     workers_query: &Query<&Worker>,
     date: &Res<Days>,
 ) {
@@ -224,6 +227,7 @@ fn execute_production_cycle(
             } else {
                 // Start a new cycle
                 let input = manufacturer.production_cycle.input.clone();
+                let mut buy_costs = Money(0);
                 for (input_material, quantity_needed) in input.iter() {
                     for _ in 0..*quantity_needed {
                         let item = manufacturer
@@ -233,13 +237,15 @@ fn execute_production_cycle(
                             .unwrap()
                             .pop()
                             .unwrap();
+                        buy_costs += items.get(item).unwrap().buy_cost;
                         commands.entity(item).despawn_recursive();
                     }
                 }
                 let (output_material, quantity_produced) =
                     &manufacturer.production_cycle.output.clone();
-                let unit_cost = cost_per_day * manufacturer.production_cycle.workdays_needed
-                    / (*quantity_produced);
+                let unit_cost = buy_costs / (*quantity_produced)
+                    + cost_per_day * manufacturer.production_cycle.workdays_needed
+                        / (*quantity_produced);
                 for _ in 0..*quantity_produced {
                     let item = Item {
                         item_type: output_material.clone(),
@@ -324,6 +330,7 @@ fn work_on_cycle_possible(
 pub fn create_sell_orders(
     mut commands: Commands,
     mut manufacturers: Query<(Entity, &mut Manufacturer, &mut SellStrategy)>,
+    mut logs: EventWriter<LogEvent>,
     items_query: Query<(&Name, &Item)>,
 ) {
     for (seller, mut manufacturer, mut strategy) in manufacturers.iter_mut() {
@@ -344,6 +351,14 @@ pub fn create_sell_orders(
                 strategy.base_price = item_cost.production_cost;
                 if strategy.current_price == Money(0) {
                     strategy.current_price = item_cost.production_cost;
+                    logs.send(LogEvent::Generic {
+                        text: format!(
+                            "I'm just starting, setting the price for {} to production cost: {}",
+                            name.as_str(),
+                            strategy.current_price
+                        ),
+                        entity: seller,
+                    });
                 }
                 let sell_order = SellOrder {
                     item,
@@ -414,7 +429,7 @@ pub fn update_sell_strategy_margin(
             continue;
         }
         let lower_bound = 0.5;
-        let upper_bound = 0.9;
+        let upper_bound = 0.8;
         let selling_ratio = sold_items as f32 / produced_items as f32;
         let change = if selling_ratio < lower_bound {
             let change =
@@ -425,7 +440,7 @@ pub fn update_sell_strategy_margin(
             let mut change =
                 (selling_ratio - upper_bound).min(1.0) * sell_strategy.max_price_change_per_day;
             if sell_strategy.current_price < sell_strategy.base_price {
-                change *= 3.0;
+                change *= 10.0;
             }
             change += 1.0;
             logs.send(LogEvent::Generic { text: format!("I'm selling too fast! Time to increase price to {} (ratio {:.2}, change {:.2}%)", sell_strategy.current_price, selling_ratio, 100.0 * change), entity: seller });
@@ -982,7 +997,7 @@ pub fn create_buy_orders(
 #[measured]
 pub fn execute_orders(
     mut commands: Commands,
-    mut buy_orders: Query<(Entity, &BuyOrder)>,
+    buy_orders: Query<(Entity, &BuyOrder)>,
     mut sell_orders: Query<(Entity, &SellOrder)>,
     mut trade_participants: Query<&mut Wallet>,
     mut buy_strategy: Query<(Entity, &mut BuyStrategy)>,
@@ -995,8 +1010,11 @@ pub fn execute_orders(
     let mut rng = rand::thread_rng();
     let mut already_sold = HashSet::new();
 
+    // iterate buy orders in randomized order
+    let mut buy_orders: Vec<_> = buy_orders.iter().collect();
+    buy_orders.shuffle(&mut rng);
     // Iterate over each buy order
-    for (buy_order_id, buy_order) in buy_orders.iter_mut() {
+    for (buy_order_id, buy_order) in buy_orders.iter() {
         let matching_sell_orders: Vec<_> = sell_orders
             .iter_mut()
             .filter(|(order_id, sell_order)| {
@@ -1015,7 +1033,7 @@ pub fn execute_orders(
             // Sort by price ascending
             let mut sorted_sample = sampled_orders;
             sorted_sample.sort_by(|(_, a), (_, b)| a.price.cmp(&b.price));
-            info!(
+            debug!(
                 "I have {} sell orders to choose from for {}, prices: ({})",
                 sorted_sample.len(),
                 buy_order.item_type.name,
@@ -1035,7 +1053,7 @@ pub fn execute_orders(
                     sorted_sample.len()
                 );
             }
-            info!(
+            debug!(
                 "I'm paying {} for {} (best price was {}) (index: {})!",
                 sorted_sample[index].1.price,
                 buy_order.item_type.name,
@@ -1050,7 +1068,7 @@ pub fn execute_orders(
                             &mut trade_participants,
                             &mut commands,
                             (sell_order_id, sell_order),
-                            (buy_order_id, buy_order),
+                            (*buy_order_id, buy_order),
                             &mut items,
                             &mut logs,
                             &mut manufacturers,
