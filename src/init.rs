@@ -204,9 +204,10 @@ impl ManufacturerTemplate {
                         items: HashMap::new(),
                         items_to_sell: Default::default(),
                     },
-                    hired_workers: workers,
-                    delay_to_fire_next_worker: 150,
+                    hired_workers: workers.clone(),
+                    days_since_last_staff_change: 150,
                     production_log: VecDeque::new(),
+                    owner: *workers.first().unwrap(),
                 },
                 wallet: Wallet::new(self.money),
                 sell_strategy: self.sell_strategy,
@@ -225,8 +226,8 @@ impl ManufacturerTemplate {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ProductionCycleTemplate {
     name: String,
-    input: HashMap<String, u32>,
-    output: (String, u32),
+    pub(crate) input: HashMap<String, u32>,
+    pub(crate) output: (String, u32),
     workdays_needed: u32,
 }
 
@@ -256,10 +257,33 @@ impl ProductionCycleTemplate {
     }
 }
 
-pub fn init_people(mut names: ResMut<Names>, mut needs: ResMut<Needs>, mut items: ResMut<Items>) {
+pub fn init_templates(
+    mut names: ResMut<Names>,
+    mut needs: ResMut<Needs>,
+    mut items: ResMut<Items>,
+) {
     names.load();
     needs.load();
     items.load();
+}
+
+pub fn init_people(names: Res<Names>, mut commands: Commands) {
+    // poor people
+    for _ in 0..100 {
+        commands.spawn((
+            Person::default(),
+            Name::new(people::generate_name(&names)),
+            Wallet::new(Money(20_000)),
+        ));
+    }
+    // rich people
+    for _ in 0..10 {
+        commands.spawn((
+            Person::default(),
+            Name::new(people::generate_name(&names)),
+            Wallet::new(Money(1_000_000)),
+        ));
+    }
 }
 
 pub fn init_manufacturers(

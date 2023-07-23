@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use bevy::prelude::*;
 use rand::distributions::{Distribution, WeightedIndex};
@@ -127,7 +127,7 @@ pub(crate) fn generate_name(names: &Res<Names>) -> String {
 #[derive(Component, Default)]
 pub struct Person {
     pub(crate) assets: Inventory,
-    pub utility: f64,
+    pub utility: VecDeque<f64>,
 }
 
 #[measured]
@@ -186,6 +186,9 @@ pub fn create_buy_orders_for_people(
         let mut total_assets = calculate_total_items(&person.assets);
         let mut item_buy_success_count = 0;
 
+        person
+            .utility
+            .push_front(utility(&needs, name, &total_assets, &price_history));
         while item_buy_success_count < 5 {
             match try_to_buy_item(
                 &needs,
@@ -195,7 +198,6 @@ pub fn create_buy_orders_for_people(
                 &mut rng,
                 buyer,
                 name,
-                &mut person,
                 &total_assets,
             ) {
                 Some(item) => {
@@ -217,7 +219,6 @@ fn try_to_buy_item(
     mut rng: &mut ThreadRng,
     buyer: Entity,
     name: &Name,
-    person: &mut Mut<Person>,
     total_assets: &HashMap<ItemType, u64>,
 ) -> Option<ItemType> {
     let mut person_marginal_utilities: HashMap<ItemType, f64> = HashMap::new();
@@ -225,64 +226,136 @@ fn try_to_buy_item(
         let util = marginal_utility(needs, name, total_assets, price_history, need);
         person_marginal_utilities.insert(need.clone(), util);
     }
-    person.utility = utility(needs, name, total_assets, price_history);
     if let Some(money_utility) = calculate_money_utility(&person_marginal_utilities, price_history)
     {
-        debug!("Money utility for {} is {}", name, money_utility);
-        let utilities_with_prices = calculate_marginal_utilities_adjusted_by_prices(
-            &person_marginal_utilities,
+        if let Some(value) = create_buy_order_with_money_utility(
             price_history,
-            money_utility,
-        );
-        // info!("Utilities without prices for {} are:\n {:#?}", name, person_marginal_utilities);
-        debug!(
-            "Utilities with prices for {} are:\n {:#?}",
-            name, utilities_with_prices
-        );
-        // Sort by utility
-        let mut utilities: Vec<(&ItemType, &f64)> = utilities_with_prices.iter().collect();
-        utilities.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap());
-
-        // Convert utilities to weights
-        let weights: Vec<f64> = utilities.iter().map(|(_, util)| **util).collect();
-
-        // Create a WeightedIndex distribution
-        let dist = WeightedIndex::new(weights);
-        if dist.is_err() {
-            logs.send(LogEvent::Generic {
-                text: "There is no item I can buy!".to_string(),
-                entity: buyer,
-            });
-            return None;
-        }
-
-        // Sample from it
-        let index = dist.unwrap().sample(&mut rng);
-
-        // Get the corresponding item
-        let (item_type, _util) = utilities[index];
-
-        trace!("Chosen item for person {} is {}", name, item_type.name);
-        let buy_order = BuyOrder {
-            item_type: item_type.clone(),
+            logs,
+            commands,
+            &mut rng,
             buyer,
-            order: OrderType::Market, // Always buying at market price
-            expiration: Some(10),
-        };
+            name,
+            &mut person_marginal_utilities,
+            money_utility,
+        ) {
+            Some(value)
+        } else {
+            create_buy_order_without_money_utlity(
+                logs,
+                commands,
+                buyer,
+                name,
+                &mut person_marginal_utilities,
+            )
+        }
+    } else {
+        create_buy_order_without_money_utlity(
+            logs,
+            commands,
+            buyer,
+            name,
+            &mut person_marginal_utilities,
+        )
+    }
+}
+
+fn create_buy_order_without_money_utlity(
+    logs: &mut EventWriter<LogEvent>,
+    commands: &mut Commands,
+    buyer: Entity,
+    name: &Name,
+    person_marginal_utilities: &mut HashMap<ItemType, f64>,
+) -> Option<ItemType> {
+    let biggest_marginal_utility_item_type = person_marginal_utilities
+        .iter()
+        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+        .map(|(item_type, _)| item_type)
+        .unwrap();
+    Some(create_buy_order(
+        logs,
+        commands,
+        buyer,
+        name,
+        biggest_marginal_utility_item_type,
+        1,
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn create_buy_order_with_money_utility(
+    price_history: &Res<PriceHistory>,
+    logs: &mut EventWriter<LogEvent>,
+    commands: &mut Commands,
+    mut rng: &mut &mut ThreadRng,
+    buyer: Entity,
+    name: &Name,
+    person_marginal_utilities: &mut HashMap<ItemType, f64>,
+    money_utility: f64,
+) -> Option<ItemType> {
+    debug!("Money utility for {} is {}", name, money_utility);
+    let utilities_with_prices = calculate_marginal_utilities_adjusted_by_prices(
+        person_marginal_utilities,
+        price_history,
+        money_utility,
+    );
+    // info!("Utilities without prices for {} are:\n {:#?}", name, person_marginal_utilities);
+    debug!(
+        "Utilities with prices for {} are:\n {:#?}",
+        name, utilities_with_prices
+    );
+    // Sort by utility
+    let mut utilities: Vec<(&ItemType, &f64)> = utilities_with_prices.iter().collect();
+    utilities.sort_by(|a, b| a.1.partial_cmp(b.1).unwrap());
+
+    // Convert utilities to weights
+    let weights: Vec<f64> = utilities.iter().map(|(_, util)| **util).collect();
+
+    // Create a WeightedIndex distribution
+    let dist = WeightedIndex::new(weights);
+    if dist.is_err() {
         logs.send(LogEvent::Generic {
-            text: format!(
-                "{}: I'll try to buy {} at market price",
-                name, item_type.name
-            ),
+            text: "There is no item I can buy!".to_string(),
             entity: buyer,
         });
-        commands.spawn((
-            buy_order.clone(),
-            Name::new(format!("Consumer {} buy order @Market", item_type.name)),
-        ));
-        return Some(item_type.clone());
+        return None;
     }
-    None
+
+    // Sample from it
+    let index = dist.unwrap().sample(&mut rng);
+
+    // Get the corresponding item
+    let (item_type, _util) = utilities[index];
+
+    trace!("Chosen item for person {} is {}", name, item_type.name);
+    Some(create_buy_order(logs, commands, buyer, name, item_type, 1))
+}
+
+fn create_buy_order(
+    logs: &mut EventWriter<LogEvent>,
+    commands: &mut Commands,
+    buyer: Entity,
+    name: &Name,
+    item_type: &ItemType,
+    expiration: u64,
+) -> ItemType {
+    let buy_order = BuyOrder {
+        item_type: item_type.clone(),
+        buyer,
+        order: OrderType::Market, // Always buying at market price
+        expiration: Some(expiration),
+    };
+    logs.send(LogEvent::Generic {
+        text: format!(
+            "{}: I'll try to buy {} at market price",
+            name, item_type.name
+        ),
+        entity: buyer,
+    });
+    commands.spawn((
+        buy_order.clone(),
+        Name::new(format!("Consumer {} buy order @Market", item_type.name)),
+    ));
+    item_type.clone()
 }
 
 fn calculate_marginal_utilities_adjusted_by_prices(

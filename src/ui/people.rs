@@ -101,7 +101,7 @@ pub fn render_people_stats(
                         money_text: wallet.get_summary(date.days, 30, 30),
                         items: count_items(&person.assets.items),
                         items_text: items_to_string(&person.assets.items),
-                        utility: person.utility,
+                        utility: person.utility.iter().take(30).sum::<f64>(),
                         employed_at: workers
                             .get(entity)
                             .and_then(|w| {

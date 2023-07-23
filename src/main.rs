@@ -17,7 +17,9 @@ use crate::ui::logs::LoggingFilterType;
 mod business;
 mod commands;
 mod config;
+mod govement;
 mod init;
+mod invariants;
 mod logs;
 mod money;
 mod people;
@@ -75,9 +77,24 @@ fn main() {
         .insert_resource(logs::Logs::default())
         .add_event::<commands::GameCommand>()
         .add_event::<logs::LogEvent>()
-        .add_systems(Startup, (init::init_people, init::init_manufacturers))
-        .add_systems(First, user_input::input_system)
-        .add_systems(PreUpdate, date_update_system.run_if(should_advance_day))
+        .add_systems(
+            Startup,
+            (
+                init::init_templates,
+                init::init_manufacturers,
+                init::init_people,
+            )
+                .chain(),
+        )
+        .add_systems(Update, user_input::input_system)
+        .add_systems(
+            PreUpdate,
+            (
+                commands::command_system,
+                date_update_system.run_if(should_advance_day),
+            )
+                .chain(),
+        )
         .add_systems(
             Update,
             (
@@ -88,12 +105,16 @@ fn main() {
                 // business::process_transactions,
                 business::produce,
                 (business::create_buy_orders, business::create_sell_orders), // those run in parallel
-                business::fire_stuff,
                 business::assing_workers_to_businesses,
-                business::hire_stuff,
+                business::fire_staff,
+                business::create_job_offers,
+                business::create_business,
                 business::take_job_offers,
                 business::update_sell_strategy_margin,
                 business::update_sell_order_prices,
+                business::payout_dividends,
+                business::reduce_days_since_last_staff_change,
+                govement::create_business_permit,
                 people::consume,
                 people::create_buy_orders_for_people,
                 stats::add_sell_orders_to_history,
@@ -101,7 +122,6 @@ fn main() {
                 .chain()
                 .run_if(next_turn),
         )
-        .add_systems(Update, commands::command_system)
         .add_systems(Update, logs::logging_system)
         .add_systems(Update, logs::delete_old_logs_system)
         .add_systems(Update, ui::debug::debug_window)
@@ -118,6 +138,11 @@ fn main() {
             ),
         )
         .add_systems(PostUpdate, turn_end_system)
+        .add_systems(
+            PostUpdate,
+            invariants::each_hired_worker_should_have_correct_employer.run_if(next_turn),
+        )
+        .add_systems(Last, business::bankruption)
         .run();
 }
 
@@ -138,6 +163,7 @@ impl Days {
 
 fn date_update_system(mut days: ResMut<Days>, time: Res<Time>) {
     days.next_day(&time);
+    info!("Day {} started", days.days);
 }
 
 fn should_advance_day(time: Res<Time>, days: Res<Days>, config: Res<Config>) -> bool {

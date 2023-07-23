@@ -2,13 +2,18 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::fmt::Display;
+use std::str::FromStr;
 
 use bevy::prelude::*;
+use either::Either;
 use rand::seq::SliceRandom;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 use macros::measured;
 
+use crate::govement::BusinessPermit;
+use crate::init::{ProductionCycleTemplate, Templates};
 use crate::logs::LogEvent;
 use crate::money::Money;
 use crate::people::Person;
@@ -73,8 +78,20 @@ pub struct Manufacturer {
     pub(crate) production_cycle: ProductionCycle,
     pub(crate) assets: Inventory,
     pub(crate) hired_workers: Vec<Entity>,
-    pub(crate) delay_to_fire_next_worker: u32,
+    pub(crate) days_since_last_staff_change: u32,
     pub(crate) production_log: VecDeque<ProductionLog>,
+    pub owner: Entity,
+}
+
+impl Manufacturer {
+    pub fn has_enough_input(&self) -> bool {
+        for (item_type, count) in &self.production_cycle.input {
+            if self.assets.items.get(item_type).unwrap_or(&vec![]).len() < *count as usize {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 #[derive(Component, Debug, Serialize, Deserialize, Copy, Clone)]
@@ -127,7 +144,7 @@ impl Ord for SellOrder {
     }
 }
 
-#[derive(Component, Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Component, Copy, Clone, Debug, Serialize, Deserialize, Default)]
 pub struct SellStrategy {
     pub(crate) max_price_change_per_day: f32,
     #[serde(skip)]
@@ -153,9 +170,10 @@ pub struct BuyOrder {
 pub struct JobOffer {
     pub salary: Money,
     pub employer: Entity,
+    pub taken_by: Option<Entity>,
 }
 
-#[derive(Component, Clone)]
+#[derive(Component, Clone, Default)]
 pub struct BuyStrategy {
     pub(crate) target_production_cycles: u32,
     pub(crate) outstanding_orders: HashMap<ItemType, u32>,
@@ -290,7 +308,7 @@ fn work_on_cycle_possible(
     // Calculate the cost for one day of work
     let mut cost_per_day = Money(0);
     for worker in manufacturer.hired_workers.iter() {
-        cost_per_day += workers_query.get(*worker).unwrap().salary;
+        cost_per_day += workers_query.get(*worker).map_or(Money(0), |w| w.salary);
     }
     debug!("Salaries cost per day: {}", cost_per_day);
 
@@ -353,15 +371,17 @@ pub fn update_sell_order_prices(
     sell_strategies: Query<&SellStrategy>,
 ) {
     for (_, name, mut sell_order) in sell_orders.iter_mut() {
-        let sell_strategy = sell_strategies.get(sell_order.seller).unwrap();
-        sell_order.price = sell_strategy.current_price;
-        debug!(
-            "Updated {} sell order price to {}",
-            name.as_str(),
-            sell_order.price
-        );
-        if sell_strategy.current_price < sell_order.base_price {
-            debug!("Oh my god, we're selling {} at a loss!", name.as_str());
+        // startegy many not exist anymore when the business went bankrupt, he sells at the base price
+        if let Ok(sell_strategy) = sell_strategies.get(sell_order.seller) {
+            sell_order.price = sell_strategy.current_price;
+            debug!(
+                "Updated {} sell order price to {}",
+                name.as_str(),
+                sell_order.price
+            );
+            if sell_strategy.current_price < sell_order.base_price {
+                debug!("Oh my god, we're selling {} at a loss!", name.as_str());
+            }
         }
     }
 }
@@ -436,9 +456,244 @@ pub fn update_sell_strategy_margin(
     }
 }
 
-pub fn hire_stuff(
+#[allow(clippy::too_many_arguments)]
+pub fn create_business(
+    mut people: Query<(Entity, &mut Person, &mut Wallet)>,
+    workers: Query<&Worker>,
+    templates: Res<Templates>,
+    business_permits: Query<(Entity, &BusinessPermit)>,
+    manufacturers: Query<&Manufacturer>,
+    buy_orders: Query<&BuyOrder>,
+    mut commands: Commands,
+    mut logs: EventWriter<LogEvent>,
+    date: Res<Days>,
+) {
+    let demand = buy_orders
+        .iter()
+        .fold(HashMap::new(), |mut acc, buy_order| {
+            *acc.entry(buy_order.item_type.clone()).or_insert(0) += 1;
+            acc
+        });
+    let unemployed = people
+        .iter_mut()
+        .filter(|(person, _, _)| workers.get(*person).is_err())
+        .count();
+    if unemployed == 0 {
+        return;
+    }
+    for (permit, _) in business_permits.iter() {
+        for (entity, _, mut wallet) in people.iter_mut() {
+            if wallet.money() > Money::from_str("100k").unwrap() {
+                if let Some(cycle) =
+                    choose_best_business(&demand, &manufacturers, &templates.production_cycles)
+                {
+                    logs.send(LogEvent::Generic {
+                        text: format!("I'm creating a business for {}", cycle.output.0.as_str()),
+                        entity,
+                    });
+                    let mut new_wallet = Wallet::default();
+                    let business_id = commands
+                        .spawn((
+                            Manufacturer {
+                                production_cycle: cycle.to_production_cycle().1,
+                                hired_workers: vec![],
+                                assets: Inventory::default(),
+                                production_log: VecDeque::new(),
+                                days_since_last_staff_change: 30,
+                                owner: entity,
+                            },
+                            Name::new(format!("{} factory", cycle.output.0.as_str())),
+                            SellStrategy {
+                                max_price_change_per_day: 0.05,
+                                ..Default::default()
+                            },
+                            BuyStrategy {
+                                target_production_cycles: 10,
+                                ..Default::default()
+                            },
+                        ))
+                        .id();
+                    wallet
+                        .transaction(
+                            &mut new_wallet,
+                            &Transaction::Transfer {
+                                side: TradeSide::Pay,
+                                sender: entity,
+                                receiver: business_id,
+                                amount: Money::from_str("100k").unwrap(),
+                                date: date.days,
+                            },
+                            &mut logs,
+                        )
+                        .unwrap(); // this must work as we check for money above
+                    commands.entity(business_id).insert(new_wallet);
+                    commands.entity(permit).despawn();
+                    break;
+                }
+            }
+        }
+    }
+}
+
+fn choose_best_business<'a>(
+    demand: &HashMap<ItemType, usize>,
+    manufacturers: &Query<&Manufacturer>,
+    cycles: &'a Vec<ProductionCycleTemplate>,
+) -> Option<&'a ProductionCycleTemplate> {
+    let demand_count_by_item_type = demand.iter().fold(
+        HashMap::new(),
+        |mut acc: HashMap<ItemType, usize>, (item_type, count)| {
+            *acc.entry(item_type.clone()).or_insert(0) += count;
+            acc
+        },
+    );
+    info!("{:?}", demand_count_by_item_type);
+    let manufacturers_count_by_item_type = manufacturers.iter().fold(
+        HashMap::new(),
+        |mut acc: HashMap<ItemType, usize>, manufacturer| {
+            *acc.entry(manufacturer.production_cycle.output.0.clone())
+                .or_insert(0) += 1;
+            acc
+        },
+    );
+    cycles.iter().map(
+        |cycle| {
+            let demand_exists = demand_count_by_item_type
+                .get(&ItemType { name: cycle.output.0.clone() })
+                .unwrap_or(&0).min(&(1_usize));
+            let count_by_manufacturers = manufacturers_count_by_item_type
+                .get(&ItemType { name: cycle.output.0.clone() })
+                .unwrap_or(&0);
+            let process_complexity = find_required_inputs(&cycle.output.0, cycles);
+            let complexity_risk = 0;//process_complexity.len();
+            let missing_input_risk = process_complexity.iter().fold(0, |acc, input| {
+                if manufacturers_count_by_item_type.contains_key(&ItemType { name: input.clone() }) {
+                    acc
+                } else {
+                    acc + 1
+                }
+            });
+
+            let risk = *demand_exists as i32 - *count_by_manufacturers as i32 - complexity_risk - missing_input_risk;
+            info!("Risk calculation for {} = {}: demand exists: {} competition size: {} process_complexity: {} missing input: {}", cycle.output.0.as_str(), risk, demand_exists, count_by_manufacturers, complexity_risk, missing_input_risk);
+            (cycle, risk)
+        }).max_by_key(|(_, count)| *count).map(|(cycle, _)| cycle)
+}
+
+pub fn bankruption(
+    manufacturers: Query<(Entity, &Name, &Manufacturer)>,
+    mut wallets: Query<&mut Wallet>,
+    mut sell_orders: Query<&mut SellOrder>,
+    buy_orders: Query<(Entity, &BuyOrder)>,
+    mut logs: EventWriter<LogEvent>,
+    mut commands: Commands,
+    date: Res<Days>,
+) {
+    for (entity, name, manufacturer) in manufacturers.iter() {
+        // TODO change to something better after implementing better job market system
+        let [mut manufacturer_wallet, mut owner_wallet] =
+            wallets.get_many_mut([entity, manufacturer.owner]).unwrap();
+        if manufacturer_wallet.money() < Money(500) {
+            info!("{} is bankrupt", name.as_str());
+            sell_orders
+                .iter_mut()
+                .filter(|sell_order| sell_order.seller == entity)
+                .for_each(|mut sell_order| {
+                    sell_order.seller = manufacturer.owner;
+                    sell_order.price = sell_order.base_price;
+                });
+            let amount = manufacturer_wallet.money();
+            manufacturer_wallet
+                .transaction(
+                    &mut owner_wallet,
+                    &Transaction::Transfer {
+                        side: TradeSide::Pay,
+                        sender: entity,
+                        receiver: manufacturer.owner,
+                        amount,
+                        date: date.days,
+                    },
+                    &mut logs,
+                )
+                .unwrap();
+            logs.send(LogEvent::Generic {
+                text: format!(
+                    "My business {} is bankrupt! I'll sell all stuff by production price.",
+                    name.as_str()
+                ),
+                entity,
+            });
+            buy_orders
+                .iter()
+                .filter(|(_, buy_order)| buy_order.buyer == entity)
+                .for_each(|(order_entity, _)| {
+                    commands.entity(order_entity).despawn_recursive();
+                });
+            commands.entity(entity).despawn_recursive();
+        }
+    }
+}
+
+pub fn payout_dividends(
+    manufacturers: Query<(Entity, &Manufacturer)>,
+    // people: Query<(Entity, &Name, &Person)>,
+    mut wallets: Query<&mut Wallet>,
+    mut logs: EventWriter<LogEvent>,
+    date: Res<Days>,
+) {
+    let dividend = 0.1 / 30.0;
+    for (owned_business, manufacturer) in manufacturers.iter() {
+        let [mut manufacturer_wallet, mut owner_wallet] = wallets
+            .get_many_mut([owned_business, manufacturer.owner])
+            .unwrap();
+        if let Either::Right(money) = manufacturer_wallet.calculate_total_change(date.days, 30) {
+            if manufacturer_wallet.money() > money * dividend {
+                // let (_, owner_name, owner) = people.get(manufacturer.owner).unwrap();
+                manufacturer_wallet
+                    .transaction(
+                        &mut owner_wallet,
+                        &Transaction::Transfer {
+                            side: TradeSide::Pay,
+                            sender: owned_business,
+                            receiver: manufacturer.owner,
+                            amount: money * dividend,
+                            date: date.days,
+                        },
+                        &mut logs,
+                    )
+                    .unwrap();
+            }
+        }
+    }
+}
+
+fn find_required_inputs(
+    cycle_output: &String,
+    global_cycles: &Vec<ProductionCycleTemplate>,
+) -> HashSet<String> {
+    let mut required_inputs = HashSet::new();
+
+    for cycle in global_cycles {
+        if cycle.output.0 == *cycle_output {
+            for input_item in cycle.input.keys() {
+                required_inputs.insert(input_item.clone());
+
+                // If there is a cycle for this input, recursively find its inputs
+                let sub_inputs = find_required_inputs(input_item, global_cycles);
+                for sub_input in sub_inputs {
+                    required_inputs.insert(sub_input);
+                }
+            }
+        }
+    }
+
+    required_inputs
+}
+
+pub fn create_job_offers(
     mut manufacturers: Query<(Entity, &mut Manufacturer, &SellStrategy)>,
     jobs: Query<&JobOffer>,
+    mut logs: EventWriter<LogEvent>,
     mut commands: Commands,
 ) {
     for (manufacturer, manufacturer_data, sell_strategy) in manufacturers.iter_mut() {
@@ -446,15 +701,32 @@ pub fn hire_stuff(
             .iter()
             .filter(|job| job.employer == manufacturer)
             .count();
-        if manufacturer_data.hired_workers.len()
+        if ((manufacturer_data.hired_workers.len()
             < manufacturer_data.production_cycle.workdays_needed as usize
-            && sell_strategy.current_price > sell_strategy.base_price * 2
+            && sell_strategy.current_price > sell_strategy.base_price * 2)
+            || (manufacturer_data.hired_workers.is_empty() && manufacturer_data.has_enough_input()))
             && total_offers == 0
+            && manufacturer_data.days_since_last_staff_change == 0
         {
+            let salary = Money(500);
             commands.spawn(JobOffer {
-                salary: Money(500),
+                salary,
                 employer: manufacturer,
+                taken_by: None,
             });
+            logs.send(LogEvent::Generic {
+                text: format!(
+                    "I'm creating a job offer for {}. My current workers: {}",
+                    salary,
+                    manufacturer_data.hired_workers.len()
+                ),
+                entity: manufacturer,
+            });
+            warn!(
+                "I'm creating a job offer for {}. My current workers: {}",
+                salary,
+                manufacturer_data.hired_workers.len()
+            );
         }
     }
 }
@@ -462,47 +734,98 @@ pub fn hire_stuff(
 pub fn take_job_offers(
     jobs: Query<(Entity, &JobOffer)>,
     unemployed: Query<(Entity, &Person), Without<Worker>>,
-    mut manufacturers: Query<&mut Manufacturer>,
+    names: Query<&Name>,
+    mut manufacturers: Query<(Entity, &mut Manufacturer)>,
+    mut logs: EventWriter<LogEvent>,
     mut commands: Commands,
 ) {
+    let mut unemployed: Vec<(Entity, &Person)> = unemployed.iter().collect();
     for (job, offer) in jobs.iter() {
-        for (person, _) in unemployed.iter() {
-            if let Ok(mut manufacturer) = manufacturers.get_mut(offer.employer) {
+        if let Some((person, _)) = unemployed.pop() {
+            if let Ok((manufacturer_entity, mut manufacturer)) =
+                manufacturers.get_mut(offer.employer)
+            {
+                // somehow people are hired multiple times
+                let worker_name = names.get(person).unwrap();
+                let manufacturer_name = names.get(manufacturer_entity).unwrap();
                 manufacturer.hired_workers.push(person);
+                manufacturer.days_since_last_staff_change = 30;
                 commands.entity(person).insert(Worker {
                     salary: offer.salary,
                     employed_at: Some(offer.employer),
                 });
+                logs.send(LogEvent::Generic {
+                    text: format!("I my job offer was taken by a worker {}!", worker_name),
+                    entity: manufacturer_entity,
+                });
+                logs.send(LogEvent::Generic {
+                    text: format!("I've taken job offer at {}!", manufacturer_name),
+                    entity: person,
+                });
+                warn!(
+                    "Job offer to work at {} taken by {}!",
+                    manufacturer_name, worker_name
+                );
                 commands.entity(job).despawn();
             }
         }
     }
 }
 
-pub fn fire_stuff(
+pub fn reduce_days_since_last_staff_change(mut manufacturers: Query<&mut Manufacturer>) {
+    for mut manufacturer in manufacturers.iter_mut() {
+        if manufacturer.days_since_last_staff_change > 0 {
+            manufacturer.days_since_last_staff_change -= 1;
+        }
+    }
+}
+
+pub fn fire_staff(
     mut manufacturers: Query<(Entity, &Wallet, &mut Manufacturer, &SellStrategy)>,
-    workers: Query<(Entity, &mut Worker)>,
+    workers: Query<(Entity, &Worker)>,
+    sell_orders: Query<&SellOrder>,
     names: Query<&Name>,
     mut logs: EventWriter<LogEvent>,
     mut commands: Commands,
 ) {
+    let sell_orders_count_grouped_by_manufacturer = sell_orders
+        .iter()
+        .map(|sell_order| sell_order.seller)
+        .fold(HashMap::new(), |mut acc, employer| {
+            *acc.entry(employer).or_insert(0) += 1;
+            acc
+        });
     for (manufacturer, wallet, mut manufacturer_data, sell_strategy) in manufacturers.iter_mut() {
-        if manufacturer_data.delay_to_fire_next_worker == 0
-            && sell_strategy.current_price < sell_strategy.base_price * 0.8
+        if manufacturer_data.days_since_last_staff_change == 0
             && manufacturer_data.hired_workers.len() > 1
+            && (sell_strategy.current_price < sell_strategy.base_price * 0.8
+                || (sell_orders_count_grouped_by_manufacturer
+                    .get(&manufacturer)
+                    .unwrap_or(&0)
+                    > &(manufacturer_data.production_cycle.output.1 * 30)))
         {
             let worker = manufacturer_data.hired_workers.pop();
             if let Some(worker) = worker {
-                let name = names.get(worker).unwrap();
-                manufacturer_data.delay_to_fire_next_worker = 30;
+                let worker_name = names.get(worker).unwrap();
+                let manufacturer_name = names.get(manufacturer).unwrap();
+                manufacturer_data.days_since_last_staff_change = 30;
                 logs.send(LogEvent::Generic {
-                    text: format!("I fired a worker {}!", name),
+                    text: format!("I fired a worker {}!", worker_name),
                     entity: manufacturer,
                 });
+                logs.send(LogEvent::Generic {
+                    text: format!("I was fired from {}!", manufacturer_name),
+                    entity: worker,
+                });
+                // let (worker, mut worker_data) = workers.get_mut(worker).unwrap();
+                // worker_data.fire();
+                warn!(
+                    "Firing worker {}, my current workers: {}",
+                    worker_name,
+                    manufacturer_data.hired_workers.len()
+                );
                 commands.entity(worker).remove::<Worker>();
             }
-        } else if manufacturer_data.delay_to_fire_next_worker > 0 {
-            manufacturer_data.delay_to_fire_next_worker -= 1;
         }
         if wallet.money()
             < manufacturer_data
@@ -525,6 +848,18 @@ pub fn fire_stuff(
                     ),
                     entity: manufacturer,
                 });
+                logs.send(LogEvent::Generic {
+                    text: format!(
+                        "I was fired from {} because he could not afford to pay me!",
+                        names.get(manufacturer).unwrap()
+                    ),
+                    entity: worker,
+                });
+                warn!(
+                    "I fired a worker {} because I can't afford to pay him! My current workers: {}",
+                    name,
+                    manufacturer_data.hired_workers.len()
+                );
                 commands.entity(worker).remove::<Worker>();
             }
         }
@@ -536,14 +871,14 @@ pub fn create_buy_orders(
     mut commands: Commands,
     mut manufacturers: Query<(Entity, &Name, &Manufacturer, &mut BuyStrategy)>,
 ) {
-    debug!(
+    info!(
         "Creating buy orders for {} buyers",
         manufacturers.iter_mut().count()
     );
     for (buyer, name, manufacturer, mut strategy) in manufacturers.iter_mut() {
         let needed_materials = &manufacturer.production_cycle.input;
         let inventory = &manufacturer.assets.items;
-        debug!(
+        info!(
             "{}: Needed materials: {:?}",
             name.as_str(),
             needed_materials
@@ -555,13 +890,13 @@ pub fn create_buy_orders(
                 .map_or(0, |items| items.len() as u32);
 
             let cycles_possible_with_current_inventory = inventory_quantity / quantity_needed;
-            debug!(
+            info!(
                 "{}: Cycles possible with current inventory: {}",
                 name, cycles_possible_with_current_inventory
             );
             if cycles_possible_with_current_inventory < strategy.target_production_cycles {
                 let current_orders = *strategy.outstanding_orders.get(material).unwrap_or(&0);
-                debug!(
+                info!(
                     "{}: I need to buy {} for {} more production cycles ({} in total). I already have {} and {:?} in orders",
                     name,
                     material.name,
@@ -575,7 +910,7 @@ pub fn create_buy_orders(
                     * quantity_needed) as i32
                     - current_orders as i32;
                 if quantity_to_buy <= 0 {
-                    debug!(
+                    info!(
                         "{}: No need to buy any more {}, I already have {} and {} in orders",
                         name,
                         material.name,
@@ -596,7 +931,7 @@ pub fn create_buy_orders(
                     order: OrderType::Market, // Always buying at market price
                 };
 
-                debug!(
+                info!(
                     "{}: Created buy order {:?} for {}",
                     name, buy_order, quantity_to_buy
                 );
@@ -646,22 +981,22 @@ pub fn execute_orders(
                 .choose_multiple(&mut rng, sample_size)
                 .cloned()
                 .collect();
-            debug!(
+
+            // Sort by price ascending
+            let mut sorted_sample = sampled_orders;
+            sorted_sample.sort_by(|(_, a), (_, b)| a.price.cmp(&b.price));
+            info!(
                 "I have {} sell orders to choose from for {}, prices: ({})",
-                sampled_orders.len(),
+                sorted_sample.len(),
                 buy_order.item_type.name,
-                sampled_orders
+                sorted_sample
                     .iter()
                     .map(|(_, sell_order)| sell_order.price.to_string())
                     .collect::<Vec<_>>()
                     .join(", ")
             );
-
-            // Sort by price ascending
-            let mut sorted_sample = sampled_orders;
-            sorted_sample.sort_by(|(_, a), (_, b)| a.price.cmp(&b.price));
-            // Get the p-th percentile order (for example, the lowest price, which would be the first one after sorting)
-            let p = 0.25; // for example, let's assume you want to get the 25th percentile order
+            // randomly get one of the top 25% of prices
+            let p = rng.gen_range(0.0..=0.10);
             let index = ((sorted_sample.len() - 1) as f64 * p).round() as usize;
             if index >= sorted_sample.len() {
                 panic!(
@@ -670,7 +1005,7 @@ pub fn execute_orders(
                     sorted_sample.len()
                 );
             }
-            debug!(
+            info!(
                 "I'm paying {} for {} (best price was {}) (index: {})!",
                 sorted_sample[index].1.price,
                 buy_order.item_type.name,
@@ -806,7 +1141,7 @@ pub fn order_expiration(mut buy_orders: Query<(Entity, &mut BuyOrder)>, mut comm
     for (buy_order_id, mut buy_order) in buy_orders.iter_mut() {
         if let Some(expiration) = buy_order.expiration {
             if expiration == 0 {
-                info!("Order expired: {:?}", buy_order);
+                debug!("Order expired: {:?}", buy_order);
                 commands.entity(buy_order_id).despawn();
             } else {
                 buy_order.expiration = Some(expiration - 1);

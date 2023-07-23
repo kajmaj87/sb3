@@ -28,6 +28,11 @@ pub enum LogEvent {
         worker: Entity,
         salary: Money,
     },
+    MoneyTransfer {
+        sender: Entity,
+        receiver: Entity,
+        amount: Money,
+    },
 }
 
 pub struct LogEntry {
@@ -96,6 +101,34 @@ pub fn logging_system(
                         buyer_name.unwrap_or("UNKNOWN".to_string())
                     ),
                     name: seller_name,
+                    day: days.days as u32,
+                });
+            }
+            LogEvent::MoneyTransfer {
+                sender,
+                receiver,
+                amount,
+            } => {
+                let sender_name = names.get(*sender).ok().map(|n| n.to_string());
+                let receiver_name = names.get(*receiver).ok().map(|n| n.to_string());
+                logs.entries.push_front(LogEntry {
+                    entity: *sender,
+                    text: format!(
+                        "I sent {} to {}",
+                        amount,
+                        receiver_name.clone().unwrap_or("UNKNOWN".to_string())
+                    ),
+                    name: sender_name.clone(),
+                    day: days.days as u32,
+                });
+                logs.entries.push_front(LogEntry {
+                    entity: *receiver,
+                    text: format!(
+                        "I received {} from {}",
+                        amount,
+                        sender_name.unwrap_or("UNKNOWN".to_string())
+                    ),
+                    name: receiver_name,
                     day: days.days as u32,
                 });
             }

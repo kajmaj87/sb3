@@ -33,6 +33,13 @@ pub enum Transaction {
         price: Money,
         date: usize,
     },
+    Transfer {
+        side: TradeSide,
+        sender: Entity,
+        receiver: Entity,
+        amount: Money,
+        date: usize,
+    },
     Salary {
         side: TradeSide,
         employer: Entity,
@@ -51,6 +58,9 @@ impl fmt::Display for Transaction {
                 price,
                 ..
             } => write!(f, "{} {} for {}", side, price, item_type.name),
+            Transaction::Transfer { side, amount, .. } => {
+                write!(f, "{} transfer of {}", side, amount)
+            }
             Transaction::Salary { side, salary, .. } => write!(f, "{} salary: {}", side, salary),
         }
     }
@@ -133,6 +143,10 @@ impl Transaction {
                 TradeSide::Pay => Either::Left(*price),
                 TradeSide::Receive => Either::Right(*price),
             },
+            Transaction::Transfer { side, amount, .. } => match side {
+                TradeSide::Pay => Either::Left(*amount),
+                TradeSide::Receive => Either::Right(*amount),
+            },
             Transaction::Salary { side, salary, .. } => match side {
                 TradeSide::Pay => Either::Left(*salary),
                 TradeSide::Receive => Either::Right(*salary),
@@ -143,6 +157,7 @@ impl Transaction {
     pub fn get_date(&self) -> usize {
         match self {
             Transaction::Trade { date, .. } => *date,
+            Transaction::Transfer { date, .. } => *date,
             Transaction::Salary { date, .. } => *date,
         }
     }
@@ -221,6 +236,31 @@ impl Wallet {
                     seller,
                     item_type,
                     price,
+                });
+            }
+            Transaction::Transfer {
+                side,
+                sender,
+                receiver,
+                amount,
+                date,
+            } => {
+                self.process_payout(other_wallet, side.clone(), amount)?;
+                let symmetric_transaction = Transaction::Transfer {
+                    side: match side {
+                        TradeSide::Pay => TradeSide::Receive,
+                        TradeSide::Receive => TradeSide::Pay,
+                    },
+                    sender: receiver,
+                    receiver: sender,
+                    amount,
+                    date,
+                };
+                other_wallet.transactions.push_front(symmetric_transaction);
+                logs.send(LogEvent::MoneyTransfer {
+                    sender,
+                    receiver,
+                    amount,
                 });
             }
             Transaction::Salary {
@@ -328,6 +368,8 @@ impl Wallet {
         let mut profit_items_amount = HashMap::new();
         let mut salary_costs = Money(0);
         let mut salary_profits = Money(0);
+        let mut transfer_gains = Money(0);
+        let mut transfer_losses = Money(0);
         let transactions = self
             .transactions
             .iter()
@@ -357,11 +399,19 @@ impl Wallet {
                     TradeSide::Pay => salary_costs += *salary,
                     TradeSide::Receive => salary_profits += *salary,
                 },
+                Transaction::Transfer { side, amount, .. } => {
+                    if *side == TradeSide::Receive {
+                        transfer_gains += *amount;
+                    } else {
+                        transfer_losses += *amount;
+                    }
+                }
             }
         }
 
-        let total_costs: Money = costs.values().sum::<Money>() + salary_costs;
-        let total_profits: Money = profits.values().sum::<Money>() + salary_profits;
+        let total_costs: Money = costs.values().sum::<Money>() + salary_costs + transfer_losses;
+        let total_profits: Money =
+            profits.values().sum::<Money>() + salary_profits + transfer_gains;
 
         let mut summary = String::new();
 
@@ -383,14 +433,18 @@ impl Wallet {
                 ));
             }
             summary.push_str(&format!(
-                "  Total Purchases: {}\n\n",
+                "  Total Purchases: {}\n",
                 total_costs - salary_costs
             ));
         }
 
         if salary_costs.0 > 0 {
-            summary.push_str(&format!("  Salaries: {}\n\n", salary_costs));
+            summary.push_str(&format!("  Salaries: {}\n", salary_costs));
         }
+        if transfer_losses.0 > 0 {
+            summary.push_str(&format!("  Transfers: {}\n", transfer_losses));
+        }
+        summary.push_str(&format!("Total costs: {}\n\n", total_costs));
 
         if !profits.is_empty() || salary_profits.0 > 0 {
             summary.push_str("Profits:\n");
@@ -415,6 +469,9 @@ impl Wallet {
 
         if salary_profits.0 > 0 {
             summary.push_str(&format!("  Salaries: {}\n\n", salary_profits));
+        }
+        if transfer_gains.0 > 0 {
+            summary.push_str(&format!("  Transfers: {}\n\n", transfer_gains));
         }
 
         if total_costs > total_profits {
