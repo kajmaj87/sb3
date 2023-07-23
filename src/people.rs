@@ -178,6 +178,7 @@ pub fn create_buy_orders_for_people(
     mut people: Query<(Entity, &Name, &Wallet, &mut Person)>,
     needs: Res<Needs>,
     price_history: Res<PriceHistory>,
+    items: Res<Items>,
     mut logs: EventWriter<LogEvent>,
     mut commands: Commands,
 ) {
@@ -198,6 +199,7 @@ pub fn create_buy_orders_for_people(
                 &mut rng,
                 buyer,
                 name,
+                &items,
                 &total_assets,
             ) {
                 Some(item) => {
@@ -212,18 +214,23 @@ pub fn create_buy_orders_for_people(
 
 #[allow(clippy::too_many_arguments)]
 fn try_to_buy_item(
-    needs: &Res<Needs>,
-    price_history: &Res<PriceHistory>,
+    needs: &Needs,
+    price_history: &PriceHistory,
     logs: &mut EventWriter<LogEvent>,
     commands: &mut Commands,
     mut rng: &mut ThreadRng,
     buyer: Entity,
     name: &Name,
+    items: &Items,
     total_assets: &HashMap<ItemType, u64>,
 ) -> Option<ItemType> {
     let mut person_marginal_utilities: HashMap<ItemType, f64> = HashMap::new();
     for need in needs.needs.iter().flat_map(|(_, n)| n.satisfied_by.keys()) {
-        let util = marginal_utility(needs, name, total_assets, price_history, need);
+        let p = items.items.get(&need.name).unwrap().consumption_rate; // probability that item will be consumed
+        let d = 0.978; // future discount rate around 1/2 after a month
+        let cumulation_factor = d * (1.0 - p) / (1.0 - d * (1.0 - p));
+        let util =
+            cumulation_factor * marginal_utility(needs, name, total_assets, price_history, need);
         person_marginal_utilities.insert(need.clone(), util);
     }
     if let Some(money_utility) = calculate_money_utility(&person_marginal_utilities, price_history)
@@ -283,7 +290,7 @@ fn create_buy_order_without_money_utlity(
 
 #[allow(clippy::too_many_arguments)]
 fn create_buy_order_with_money_utility(
-    price_history: &Res<PriceHistory>,
+    price_history: &PriceHistory,
     logs: &mut EventWriter<LogEvent>,
     commands: &mut Commands,
     mut rng: &mut &mut ThreadRng,
@@ -360,7 +367,7 @@ fn create_buy_order(
 
 fn calculate_marginal_utilities_adjusted_by_prices(
     item_utilities: &HashMap<ItemType, f64>,
-    price_history: &Res<PriceHistory>,
+    price_history: &PriceHistory,
     money_utility: f64,
 ) -> HashMap<ItemType, f64> {
     let mut result = HashMap::new();
@@ -379,7 +386,7 @@ fn calculate_marginal_utilities_adjusted_by_prices(
 
 fn calculate_money_utility(
     item_utilities: &HashMap<ItemType, f64>,
-    price_history: &Res<PriceHistory>,
+    price_history: &PriceHistory,
 ) -> Option<f64> {
     let mut total_utility = 0.0;
     let mut price_count = 0;

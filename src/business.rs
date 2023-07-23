@@ -422,8 +422,12 @@ pub fn update_sell_strategy_margin(
             logs.send(LogEvent::Generic { text: format!("I'm selling too slow! Time to decrease price to {} (ratio {:.2}, change {:.2}%)", sell_strategy.current_price, selling_ratio, 100.0 * change), entity: seller });
             change
         } else if selling_ratio > upper_bound {
-            let change = 1.0
-                + (selling_ratio - upper_bound).min(1.0) * sell_strategy.max_price_change_per_day;
+            let mut change =
+                (selling_ratio - upper_bound).min(1.0) * sell_strategy.max_price_change_per_day;
+            if sell_strategy.current_price < sell_strategy.base_price {
+                change *= 3.0;
+            }
+            change += 1.0;
             logs.send(LogEvent::Generic { text: format!("I'm selling too fast! Time to increase price to {} (ratio {:.2}, change {:.2}%)", sell_strategy.current_price, selling_ratio, 100.0 * change), entity: seller });
             change
             // sell_strategy.current_price -= change;
@@ -458,11 +462,12 @@ pub fn update_sell_strategy_margin(
 
 #[allow(clippy::too_many_arguments)]
 pub fn create_business(
-    mut people: Query<(Entity, &mut Person, &mut Wallet)>,
+    mut people: Query<(Entity, &mut Person)>,
+    mut wallets: Query<&mut Wallet>,
     workers: Query<&Worker>,
     templates: Res<Templates>,
     business_permits: Query<(Entity, &BusinessPermit)>,
-    manufacturers: Query<&Manufacturer>,
+    manufacturers: Query<(Entity, &Manufacturer)>,
     buy_orders: Query<&BuyOrder>,
     mut commands: Commands,
     mut logs: EventWriter<LogEvent>,
@@ -476,17 +481,36 @@ pub fn create_business(
         });
     let unemployed = people
         .iter_mut()
-        .filter(|(person, _, _)| workers.get(*person).is_err())
+        .filter(|(person, _)| workers.get(*person).is_err())
         .count();
     if unemployed == 0 {
         return;
     }
+    let last_days = 10;
+    let sells_in_last_days =
+        manufacturers
+            .iter()
+            .fold(HashMap::new(), |mut acc, (entity, manufacturer)| {
+                let manufacturer_wallet = wallets.get(entity).unwrap();
+                let sells = manufacturer_wallet.get_amount_of_sell_transactions(
+                    date.days,
+                    &manufacturer.production_cycle.output.0,
+                    last_days,
+                );
+                *acc.entry(&manufacturer.production_cycle.output.0)
+                    .or_insert(0) += sells;
+                acc
+            });
     for (permit, _) in business_permits.iter() {
-        for (entity, _, mut wallet) in people.iter_mut() {
+        for (entity, _) in people.iter_mut() {
+            let mut wallet = wallets.get_mut(entity).unwrap();
             if wallet.money() > Money::from_str("100k").unwrap() {
-                if let Some(cycle) =
-                    choose_best_business(&demand, &manufacturers, &templates.production_cycles)
-                {
+                if let Some(cycle) = choose_best_business(
+                    &demand,
+                    &sells_in_last_days,
+                    &manufacturers,
+                    &templates.production_cycles,
+                ) {
                     logs.send(LogEvent::Generic {
                         text: format!("I'm creating a business for {}", cycle.output.0.as_str()),
                         entity,
@@ -499,7 +523,7 @@ pub fn create_business(
                                 hired_workers: vec![],
                                 assets: Inventory::default(),
                                 production_log: VecDeque::new(),
-                                days_since_last_staff_change: 30,
+                                days_since_last_staff_change: 0,
                                 owner: entity,
                             },
                             Name::new(format!("{} factory", cycle.output.0.as_str())),
@@ -537,7 +561,8 @@ pub fn create_business(
 
 fn choose_best_business<'a>(
     demand: &HashMap<ItemType, usize>,
-    manufacturers: &Query<&Manufacturer>,
+    sells: &HashMap<&ItemType, usize>,
+    manufacturers: &Query<(Entity, &Manufacturer)>,
     cycles: &'a Vec<ProductionCycleTemplate>,
 ) -> Option<&'a ProductionCycleTemplate> {
     let demand_count_by_item_type = demand.iter().fold(
@@ -550,7 +575,7 @@ fn choose_best_business<'a>(
     info!("{:?}", demand_count_by_item_type);
     let manufacturers_count_by_item_type = manufacturers.iter().fold(
         HashMap::new(),
-        |mut acc: HashMap<ItemType, usize>, manufacturer| {
+        |mut acc: HashMap<ItemType, usize>, (_, manufacturer)| {
             *acc.entry(manufacturer.production_cycle.output.0.clone())
                 .or_insert(0) += 1;
             acc
@@ -561,9 +586,14 @@ fn choose_best_business<'a>(
             let demand_exists = demand_count_by_item_type
                 .get(&ItemType { name: cycle.output.0.clone() })
                 .unwrap_or(&0).min(&(1_usize));
+            let sells = sells.get(&ItemType { name: cycle.output.0.clone() }).unwrap_or(&0);
+            let extreme_demand = demand_count_by_item_type
+                .get(&ItemType { name: cycle.output.0.clone() })
+                .unwrap_or(&0) > sells && sells > &0_usize;
             let count_by_manufacturers = manufacturers_count_by_item_type
                 .get(&ItemType { name: cycle.output.0.clone() })
                 .unwrap_or(&0);
+            let extreme_demand_bonus = if extreme_demand { 5 } else { 0 };
             let process_complexity = find_required_inputs(&cycle.output.0, cycles);
             let complexity_risk = 0;//process_complexity.len();
             let missing_input_risk = process_complexity.iter().fold(0, |acc, input| {
@@ -574,8 +604,8 @@ fn choose_best_business<'a>(
                 }
             });
 
-            let risk = *demand_exists as i32 - *count_by_manufacturers as i32 - complexity_risk - missing_input_risk;
-            info!("Risk calculation for {} = {}: demand exists: {} competition size: {} process_complexity: {} missing input: {}", cycle.output.0.as_str(), risk, demand_exists, count_by_manufacturers, complexity_risk, missing_input_risk);
+            let risk = extreme_demand_bonus + *demand_exists as i32 - *count_by_manufacturers as i32 - complexity_risk - missing_input_risk;
+            info!("Risk calculation for {} = {}: extreme_demand: {}, demand exists: {} competition size: {} process_complexity: {} missing input: {}", cycle.output.0.as_str(), risk, extreme_demand, demand_exists, count_by_manufacturers, complexity_risk, missing_input_risk);
             (cycle, risk)
         }).max_by_key(|(_, count)| *count).map(|(cycle, _)| cycle)
 }
