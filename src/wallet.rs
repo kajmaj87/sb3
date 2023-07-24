@@ -1,4 +1,4 @@
-use crate::business::ItemType;
+use crate::business::{Item, ItemType};
 use crate::logs::LogEvent;
 use crate::money::{Money, MoneyChange};
 use bevy::prelude::*;
@@ -28,7 +28,7 @@ pub enum Transaction {
         side: TradeSide,
         buyer: Entity,
         seller: Entity,
-        item: Entity,
+        item: Item,
         item_type: ItemType,
         price: Money,
         date: usize,
@@ -166,6 +166,7 @@ impl Transaction {
 #[derive(Debug, Clone)]
 pub enum TransactionError {
     InsufficientFunds(Money),
+    SellOrderEmpty,
     WalletNotFound,
 }
 

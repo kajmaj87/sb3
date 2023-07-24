@@ -34,14 +34,14 @@ pub fn render_manufacturers_stats(
     date: Res<Days>,
 ) {
     Window::new("Manufacturers").show(egui_context.ctx_mut(), |ui| {
-        let mut owner_counts: HashMap<Entity, usize> = HashMap::new();
+        let mut owner_counts: HashMap<Entity, u32> = HashMap::new();
         let total_money = manufacturers
             .iter()
             .map(|(_, _, wallet, _, _)| wallet.money())
             .sum::<Money>();
 
         for order in sell_orders.iter() {
-            *owner_counts.entry(order.seller).or_insert(0) += 1;
+            *owner_counts.entry(order.seller).or_insert(0) += order.items.len() as u32;
         }
         ui.label(format!("Total manufactuters money: {}", total_money));
 
@@ -257,9 +257,13 @@ pub fn render_manufacturers_stats(
                         });
                         row.col(|ui| {
                             if r.on_market_text.is_empty() {
-                                label_with_hover_text(ui, r.on_market, "No price history yet");
+                                label_with_hover_text(
+                                    ui,
+                                    r.on_market as usize,
+                                    "No price history yet",
+                                );
                             } else {
-                                label_with_hover_text(ui, r.on_market, &r.on_market_text);
+                                label_with_hover_text(ui, r.on_market as usize, &r.on_market_text);
                             }
                         });
                         row.col(|ui| {
@@ -305,7 +309,7 @@ struct ManufacturerRow {
     workers: usize,
     items: usize,
     items_to_sell: usize,
-    on_market: usize,
+    on_market: u32,
     on_market_text: String,
     buy_orders: usize,
     items_text: String,

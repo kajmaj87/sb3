@@ -131,11 +131,7 @@ pub struct Person {
 }
 
 #[measured]
-pub fn consume(
-    mut people: Query<(Entity, &Name, &mut Person)>,
-    items: Res<Items>,
-    mut commands: Commands,
-) {
+pub fn consume(mut people: Query<(Entity, &Name, &mut Person)>, items: Res<Items>) {
     let mut rng = rand::thread_rng();
     for (_, name, mut person) in people.iter_mut() {
         let mut amount_to_remove: HashMap<ItemType, usize> = HashMap::new();
@@ -167,8 +163,7 @@ pub fn consume(
                 .items
                 .get_mut(item_type)
                 .unwrap()
-                .drain(0..*amount)
-                .for_each(|e| commands.entity(e).despawn());
+                .drain(0..*amount);
         }
     }
 }

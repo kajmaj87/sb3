@@ -140,7 +140,15 @@ fn main() {
         .add_systems(PostUpdate, turn_end_system)
         .add_systems(
             PostUpdate,
-            invariants::each_hired_worker_should_have_correct_employer.run_if(next_turn),
+            (
+                invariants::each_hired_worker_should_have_correct_employer,
+                (
+                    business::merge_sell_orders,
+                    business::delete_empty_sell_orders,
+                )
+                    .chain(),
+            )
+                .run_if(next_turn),
         )
         .add_systems(Last, business::bankruption)
         .run();

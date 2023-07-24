@@ -6,6 +6,7 @@ use std::str::FromStr;
 
 use bevy::prelude::*;
 use either::Either;
+use rand::distributions::{Distribution, WeightedIndex};
 use rand::seq::SliceRandom;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -56,8 +57,8 @@ impl Display for ProductionCycle {
 
 #[derive(Debug, Default)]
 pub struct Inventory {
-    pub(crate) items: HashMap<ItemType, Vec<Entity>>,
-    pub(crate) items_to_sell: HashSet<Entity>,
+    pub(crate) items: HashMap<ItemType, Vec<Item>>,
+    pub(crate) items_to_sell: Vec<Item>,
 }
 
 #[derive(Bundle)]
@@ -86,7 +87,7 @@ pub struct Manufacturer {
 impl Manufacturer {
     pub fn has_enough_input(&self) -> bool {
         for (item_type, count) in &self.production_cycle.input {
-            if self.assets.items.get(item_type).unwrap_or(&vec![]).len() < *count as usize {
+            if self.assets.items.get(item_type).unwrap_or(&vec![]).len() < (*count as usize) {
                 return false;
             }
         }
@@ -100,16 +101,16 @@ pub struct Worker {
     pub(crate) employed_at: Option<Entity>,
 }
 
-#[derive(Component, Debug)]
+#[derive(Debug, Clone)]
 pub struct Item {
     item_type: ItemType,
     production_cost: Money,
     buy_cost: Money,
 }
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone)]
 pub struct SellOrder {
-    item: Entity,
+    pub(crate) items: Vec<Item>,
     pub(crate) item_type: ItemType,
     pub(crate) seller: Entity,
     pub(crate) price: Money,
@@ -190,30 +191,19 @@ pub enum MaxCycleError {
 #[measured]
 pub fn produce(
     mut manufacturers: Query<(&Wallet, &mut Manufacturer)>,
-    mut commands: Commands,
-    items: Query<&Item>,
     workers_query: Query<&Worker>,
     date: Res<Days>,
 ) {
     for (wallet, mut manufacturer) in manufacturers.iter_mut() {
         // fill production cycle
         // produce_for_manufacturer(&mut b, commands, &production_cost);
-        execute_production_cycle(
-            &mut commands,
-            &mut manufacturer,
-            wallet,
-            &items,
-            &workers_query,
-            &date,
-        )
+        execute_production_cycle(&mut manufacturer, wallet, &workers_query, &date)
     }
 }
 
 fn execute_production_cycle(
-    commands: &mut Commands,
     manufacturer: &mut Mut<Manufacturer>,
     wallet: &Wallet,
-    items: &Query<&Item>,
     workers_query: &Query<&Worker>,
     date: &Res<Days>,
 ) {
@@ -229,17 +219,16 @@ fn execute_production_cycle(
                 let input = manufacturer.production_cycle.input.clone();
                 let mut buy_costs = Money(0);
                 for (input_material, quantity_needed) in input.iter() {
-                    for _ in 0..*quantity_needed {
-                        let item = manufacturer
-                            .assets
-                            .items
-                            .get_mut(input_material)
-                            .unwrap()
-                            .pop()
-                            .unwrap();
-                        buy_costs += items.get(item).unwrap().buy_cost;
-                        commands.entity(item).despawn_recursive();
-                    }
+                    // drain the quantity needed from the inventory and sum up costs
+                    let item_costs: Money = manufacturer
+                        .assets
+                        .items
+                        .get_mut(input_material)
+                        .unwrap()
+                        .drain(..*quantity_needed as usize)
+                        .map(|item| item.buy_cost)
+                        .sum::<Money>();
+                    buy_costs += item_costs;
                 }
                 let (output_material, quantity_produced) =
                     &manufacturer.production_cycle.output.clone();
@@ -247,16 +236,13 @@ fn execute_production_cycle(
                     + cost_per_day * manufacturer.production_cycle.workdays_needed
                         / (*quantity_produced);
                 for _ in 0..*quantity_produced {
-                    let item = Item {
+                    let output_item = Item {
                         item_type: output_material.clone(),
                         production_cost: unit_cost,
                         buy_cost: Money(0),
                     };
-                    debug!("Produced {:?}", item);
-                    let output_item = commands
-                        .spawn((item, Name::new(output_material.name.to_string())))
-                        .id();
-                    manufacturer.assets.items_to_sell.insert(output_item);
+                    debug!("Produced {:?}", output_item);
+                    manufacturer.assets.items_to_sell.push(output_item);
                     manufacturer
                         .production_log
                         .push_front(ProductionLog { date: date.days });
@@ -331,51 +317,96 @@ pub fn create_sell_orders(
     mut commands: Commands,
     mut manufacturers: Query<(Entity, &mut Manufacturer, &mut SellStrategy)>,
     mut logs: EventWriter<LogEvent>,
-    items_query: Query<(&Name, &Item)>,
 ) {
     for (seller, mut manufacturer, mut strategy) in manufacturers.iter_mut() {
-        let mut items_to_sell = vec![];
         let amount_to_sell = (manufacturer.assets.items_to_sell.len()
             * manufacturer.hired_workers.len())
             / manufacturer.production_cycle.workdays_needed as usize;
-        for item in manufacturer
+        debug!(
+            "Creating sell orders for {} items from {}",
+            amount_to_sell,
+            manufacturer.assets.items_to_sell.len()
+        );
+        let items_to_sell = manufacturer
             .assets
             .items_to_sell
-            .iter()
-            .take(amount_to_sell)
-        {
-            items_to_sell.push(*item);
-        }
-        for item in items_to_sell {
-            if let Ok((name, item_cost)) = items_query.get(item) {
-                strategy.base_price = item_cost.production_cost;
-                if strategy.current_price == Money(0) {
-                    strategy.current_price = item_cost.production_cost;
-                    logs.send(LogEvent::Generic {
-                        text: format!(
-                            "I'm just starting, setting the price for {} to production cost: {}",
-                            name.as_str(),
-                            strategy.current_price
-                        ),
-                        entity: seller,
-                    });
-                }
-                let sell_order = SellOrder {
-                    item,
-                    item_type: item_cost.item_type.clone(),
-                    seller,
-                    price: strategy.current_price,
-                    base_price: item_cost.production_cost,
-                };
-                debug!("Created sell order {:?} for {}", sell_order, name.as_str());
-                let strategy_copy = *strategy;
-                commands.spawn((
-                    sell_order,
-                    Name::new(format!("{} sell order", name.as_str())),
-                    strategy_copy,
-                ));
-                manufacturer.assets.items_to_sell.remove(&item);
+            .drain(..amount_to_sell)
+            .collect::<Vec<Item>>();
+        debug!(
+            "Creating sell orders for {} items from (size after draining: {})",
+            items_to_sell.len(),
+            manufacturer.assets.items_to_sell.len()
+        );
+        if let Some(first_item) = items_to_sell.get(0) {
+            let item_name = first_item.item_type.name.clone();
+            strategy.base_price = first_item.production_cost;
+            if strategy.current_price == Money(0) {
+                strategy.current_price = first_item.production_cost;
+                logs.send(LogEvent::Generic {
+                    text: format!(
+                        "I'm just starting, setting the price for {} to production cost: {}",
+                        first_item.item_type.name.as_str(),
+                        strategy.current_price
+                    ),
+                    entity: seller,
+                });
             }
+            let sell_order = SellOrder {
+                items: items_to_sell.to_vec(),
+                item_type: first_item.item_type.clone(),
+                seller,
+                price: strategy.current_price,
+                base_price: strategy.base_price,
+            };
+            debug!(
+                "Created sell order {:?} for {} with total {} items",
+                sell_order,
+                item_name,
+                sell_order.items.len()
+            );
+            let strategy_copy = *strategy;
+            commands.spawn((
+                sell_order,
+                Name::new(format!("{} sell order", item_name)),
+                strategy_copy,
+            ));
+        }
+    }
+}
+
+pub fn merge_sell_orders(mut sell_orders: Query<(Entity, &mut SellOrder)>) {
+    // Map from seller to (first_order_entity, accumulated_items)
+    let mut order_map: HashMap<Entity, (Entity, Vec<Item>)> = HashMap::new();
+
+    for (order_entity, mut sell_order) in sell_orders.iter_mut() {
+        match order_map.get_mut(&sell_order.seller) {
+            Some((_, first_order_items)) => {
+                // Accumulate items and despawn if not the first order.
+                first_order_items.append(&mut sell_order.items);
+            }
+            None => {
+                // This is the first order from this seller, remember it.
+                order_map.insert(sell_order.seller, (order_entity, sell_order.items.clone()));
+            }
+        }
+    }
+
+    // Update the first order of each seller with the accumulated items.
+    for (_, (first_order_entity, first_order_items)) in order_map {
+        if let Ok((_, mut sell_order)) = sell_orders.get_mut(first_order_entity) {
+            debug!(
+                "Setting items of sell order {:?} to {:?}",
+                sell_order, first_order_items
+            );
+            sell_order.items = first_order_items;
+        }
+    }
+}
+
+pub fn delete_empty_sell_orders(mut commands: Commands, sell_orders: Query<(Entity, &SellOrder)>) {
+    for (sell_order_entity, sell_order) in sell_orders.iter() {
+        if sell_order.items.is_empty() {
+            commands.entity(sell_order_entity).despawn_recursive();
         }
     }
 }
@@ -587,7 +618,7 @@ fn choose_best_business<'a>(
             acc
         },
     );
-    info!("{:?}", demand_count_by_item_type);
+    debug!("{:?}", demand_count_by_item_type);
     let manufacturers_count_by_item_type = manufacturers.iter().fold(
         HashMap::new(),
         |mut acc: HashMap<ItemType, usize>, (_, manufacturer)| {
@@ -620,7 +651,7 @@ fn choose_best_business<'a>(
             });
 
             let risk = extreme_demand_bonus + *demand_exists as i32 - *count_by_manufacturers as i32 - complexity_risk - missing_input_risk;
-            info!("Risk calculation for {} = {}: extreme_demand: {}, demand exists: {} competition size: {} process_complexity: {} missing input: {}", cycle.output.0.as_str(), risk, extreme_demand, demand_exists, count_by_manufacturers, complexity_risk, missing_input_risk);
+            debug!("Risk calculation for {} = {}: extreme_demand: {}, demand exists: {} competition size: {} process_complexity: {} missing input: {}", cycle.output.0.as_str(), risk, extreme_demand, demand_exists, count_by_manufacturers, complexity_risk, missing_input_risk);
             (cycle, risk)
         }).max_by_key(|(_, count)| *count).map(|(cycle, _)| cycle)
 }
@@ -786,10 +817,8 @@ pub fn take_job_offers(
 ) {
     let mut unemployed: Vec<(Entity, &Person)> = unemployed.iter().collect();
     for (job, offer) in jobs.iter() {
-        if let Some((person, _)) = unemployed.pop() {
-            if let Ok((manufacturer_entity, mut manufacturer)) =
-                manufacturers.get_mut(offer.employer)
-            {
+        if let Ok((manufacturer_entity, mut manufacturer)) = manufacturers.get_mut(offer.employer) {
+            if let Some((person, _)) = unemployed.pop() {
                 // somehow people are hired multiple times
                 let worker_name = names.get(person).unwrap();
                 let manufacturer_name = names.get(manufacturer_entity).unwrap();
@@ -813,6 +842,9 @@ pub fn take_job_offers(
                 );
                 commands.entity(job).despawn();
             }
+        } else {
+            // employer no longer exists
+            commands.entity(job).despawn();
         }
     }
 }
@@ -916,14 +948,14 @@ pub fn create_buy_orders(
     mut commands: Commands,
     mut manufacturers: Query<(Entity, &Name, &Manufacturer, &mut BuyStrategy)>,
 ) {
-    info!(
+    debug!(
         "Creating buy orders for {} buyers",
         manufacturers.iter_mut().count()
     );
     for (buyer, name, manufacturer, mut strategy) in manufacturers.iter_mut() {
         let needed_materials = &manufacturer.production_cycle.input;
         let inventory = &manufacturer.assets.items;
-        info!(
+        debug!(
             "{}: Needed materials: {:?}",
             name.as_str(),
             needed_materials
@@ -935,13 +967,13 @@ pub fn create_buy_orders(
                 .map_or(0, |items| items.len() as u32);
 
             let cycles_possible_with_current_inventory = inventory_quantity / quantity_needed;
-            info!(
+            debug!(
                 "{}: Cycles possible with current inventory: {}",
                 name, cycles_possible_with_current_inventory
             );
             if cycles_possible_with_current_inventory < strategy.target_production_cycles {
                 let current_orders = *strategy.outstanding_orders.get(material).unwrap_or(&0);
-                info!(
+                debug!(
                     "{}: I need to buy {} for {} more production cycles ({} in total). I already have {} and {:?} in orders",
                     name,
                     material.name,
@@ -955,7 +987,7 @@ pub fn create_buy_orders(
                     * quantity_needed) as i32
                     - current_orders as i32;
                 if quantity_to_buy <= 0 {
-                    info!(
+                    debug!(
                         "{}: No need to buy any more {}, I already have {} and {} in orders",
                         name,
                         material.name,
@@ -976,7 +1008,7 @@ pub fn create_buy_orders(
                     order: OrderType::Market, // Always buying at market price
                 };
 
-                info!(
+                debug!(
                     "{}: Created buy order {:?} for {}",
                     name, buy_order, quantity_to_buy
                 );
@@ -998,17 +1030,15 @@ pub fn create_buy_orders(
 pub fn execute_orders(
     mut commands: Commands,
     buy_orders: Query<(Entity, &BuyOrder)>,
-    mut sell_orders: Query<(Entity, &SellOrder)>,
+    mut sell_orders: Query<(Entity, &mut SellOrder)>,
     mut trade_participants: Query<&mut Wallet>,
     mut buy_strategy: Query<(Entity, &mut BuyStrategy)>,
-    mut items: Query<(Entity, &mut Item)>,
     mut logs: EventWriter<LogEvent>,
     mut manufacturers: Query<(Entity, &mut Manufacturer)>,
     mut people: Query<(Entity, &mut Person)>,
     date: Res<Days>,
 ) {
     let mut rng = rand::thread_rng();
-    let mut already_sold = HashSet::new();
 
     // iterate buy orders in randomized order
     let mut buy_orders: Vec<_> = buy_orders.iter().collect();
@@ -1016,23 +1046,22 @@ pub fn execute_orders(
     // Iterate over each buy order
     for (buy_order_id, buy_order) in buy_orders.iter() {
         let matching_sell_orders: Vec<_> = sell_orders
-            .iter_mut()
-            .filter(|(order_id, sell_order)| {
-                sell_order.item_type == buy_order.item_type && !already_sold.contains(order_id)
+            .iter()
+            .filter(|(_, sell_order)| {
+                sell_order.item_type == buy_order.item_type && !sell_order.items.is_empty()
             }) // Match by material
             .collect();
 
         if !matching_sell_orders.is_empty() {
             // Take a random sample
             let sample_size = (matching_sell_orders.len() as f64 * 0.1).ceil() as usize; // 10% for example
-            let sampled_orders: Vec<_> = matching_sell_orders
-                .choose_multiple(&mut rng, sample_size)
-                .cloned()
-                .collect();
+            let sampled_orders: Vec<_> = choose_weighted_orders(&matching_sell_orders, sample_size);
 
             // Sort by price ascending
             let mut sorted_sample = sampled_orders;
             sorted_sample.sort_by(|(_, a), (_, b)| a.price.cmp(&b.price));
+            let sampled_sell_order_ids =
+                sorted_sample.iter().map(|(id, _)| *id).collect::<Vec<_>>();
             debug!(
                 "I have {} sell orders to choose from for {}, prices: ({})",
                 sorted_sample.len(),
@@ -1060,36 +1089,49 @@ pub fn execute_orders(
                 sorted_sample.first().unwrap().1.price,
                 index
             );
-            if let Some(&(sell_order_id, sell_order)) = sorted_sample.get(index) {
+            if let Some(sell_order_id) = sampled_sell_order_ids.get(index) {
                 match buy_order.order {
                     OrderType::Market => {
-                        if execute_order(
+                        let _ = execute_order(
                             &mut buy_strategy,
                             &mut trade_participants,
                             &mut commands,
-                            (sell_order_id, sell_order),
+                            sell_order_id,
+                            &mut sell_orders,
                             (*buy_order_id, buy_order),
-                            &mut items,
                             &mut logs,
                             &mut manufacturers,
                             &mut people,
                             &date,
-                        )
-                        .is_ok()
-                        {
-                            already_sold.insert(sell_order_id);
-                        }
+                        );
                     }
                 }
             }
         } else {
-            trace!(
+            debug!(
                 "No sell orders for {} (buy order: {:?})",
-                buy_order.item_type.name,
-                buy_order
+                buy_order.item_type.name, buy_order
             );
         }
     }
+}
+
+fn choose_weighted_orders<'a>(
+    items: &'a [(Entity, &'a SellOrder)],
+    sample_size: usize,
+) -> Vec<(Entity, &'a SellOrder)> {
+    let mut rng = rand::thread_rng();
+    // Create a WeightedIndex distribution with the order quantities as weights
+    let weights: Vec<_> = items
+        .iter()
+        .map(|(_, sell_order)| sell_order.items.len())
+        .collect();
+    let dist = WeightedIndex::new(weights).unwrap();
+
+    // Sample from the distribution to get indices, and return the corresponding items
+    (0..sample_size)
+        .map(|_| items[dist.sample(&mut rng)])
+        .collect()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1097,22 +1139,30 @@ fn execute_order(
     buy_strategy: &mut Query<(Entity, &mut BuyStrategy)>,
     trade_participants: &mut Query<&mut Wallet>,
     commands: &mut Commands,
-    sell_order: (Entity, &SellOrder),
+    sell_order_id: &Entity,
+    sell_orders: &mut Query<(Entity, &mut SellOrder)>,
     buy_order: (Entity, &BuyOrder),
-    items: &mut Query<(Entity, &mut Item)>,
     logs: &mut EventWriter<LogEvent>,
     manufacturers: &mut Query<(Entity, &mut Manufacturer)>,
     people: &mut Query<(Entity, &mut Person)>,
     date: &Res<Days>,
 ) -> Result<(), TransactionError> {
-    let (sell_order_id, sell_order) = sell_order;
+    // let (sell_order_id, &mut sell_order) = sell_order;
+    let (_, mut sell_order) = sell_orders.get_mut(*sell_order_id).unwrap();
     let (buy_order_id, buy_order) = buy_order;
     // Assume that the item type in the sell order is same as the buy order
     assert_eq!(buy_order.item_type, sell_order.item_type);
+    if sell_order.items.is_empty() {
+        warn!("Sell order {} has quantity 0", sell_order.item_type);
+        return Err(TransactionError::SellOrderEmpty);
+    }
 
     let [mut buyer_wallet, mut seller_wallet] = trade_participants
         .get_many_mut([buy_order.buyer, sell_order.seller])
         .map_err(|_| TransactionError::WalletNotFound)?;
+
+    let mut item_to_sell = sell_order.items.last().unwrap().clone();
+    item_to_sell.buy_cost = sell_order.price;
 
     buyer_wallet.transaction(
         &mut seller_wallet,
@@ -1120,31 +1170,32 @@ fn execute_order(
             side: TradeSide::Pay,
             buyer: buy_order.buyer,
             seller: sell_order.seller,
-            item: sell_order.item,
+            item: item_to_sell.clone(),
             item_type: sell_order.item_type.clone(),
             price: sell_order.price,
             date: date.days,
         },
         logs,
     )?;
+    // we remove the item only if the transaction was successful
+    sell_order.items.pop();
     if let Ok((_, mut strategy)) = buy_strategy.get_mut(buy_order.buyer) {
         *strategy
             .outstanding_orders
             .get_mut(&buy_order.item_type)
             .unwrap() -= 1;
     }
-    if let Ok((_, mut item)) = items.get_mut(sell_order.item) {
-        item.buy_cost = sell_order.price;
-    }
     commands.entity(buy_order_id).despawn();
-    commands.entity(sell_order_id).despawn();
+    if sell_order.items.is_empty() {
+        commands.entity(*sell_order_id).despawn();
+    }
     if let Ok((_, mut person)) = people.get_mut(buy_order.buyer) {
         person
             .assets
             .items
             .entry(sell_order.item_type.clone())
             .or_default()
-            .push(sell_order.item);
+            .push(item_to_sell.clone());
     }
     if let Ok((_, mut manufacturer)) = manufacturers.get_mut(buy_order.buyer) {
         manufacturer
@@ -1152,10 +1203,7 @@ fn execute_order(
             .items
             .entry(sell_order.item_type.clone())
             .or_default()
-            .push(sell_order.item);
-    }
-    if let Ok((_, mut manufacturer)) = manufacturers.get_mut(sell_order.seller) {
-        manufacturer.assets.items_to_sell.remove(&sell_order.item);
+            .push(item_to_sell);
     }
     Ok(())
 }
