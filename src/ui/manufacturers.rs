@@ -230,10 +230,10 @@ pub fn render_manufacturers_stats(
                     body.row(20.0, |mut row| {
                         row.col(|ui| {
                             if r.pinned {
-                                if ui.button("U").on_hover_text("Unpin this person").clicked() {
+                                if ui.button("U").on_hover_text("Unpin this manufacturer").clicked() {
                                     commands.entity(r.entity).remove::<Pinned>();
                                 }
-                            } else if ui.button("P").on_hover_text("Pin this person").clicked() {
+                            } else if ui.button("P").on_hover_text("Pin this manufacturer").clicked() {
                                 commands.entity(r.entity).insert(Pinned {});
                             }
                         });
