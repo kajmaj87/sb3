@@ -13,7 +13,7 @@ use crate::business::{
     BuyStrategy, Inventory, ItemType, Manufacturer, ManufacturerBundle, ProductionCycle,
     SellStrategy, Worker,
 };
-use crate::money::money_from_str_or_num;
+use crate::config::Config;
 use crate::money::Money;
 use crate::people;
 use crate::people::{Items, Person};
@@ -163,7 +163,6 @@ impl Templates {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ManufacturerTemplate {
     name: String,
-    #[serde(deserialize_with = "money_from_str_or_num")]
     money: Money,
     workers: Vec<Worker>,
     production_cycle: String,
@@ -267,9 +266,9 @@ pub fn init_templates(
     items.load();
 }
 
-pub fn init_people(names: Res<Names>, mut commands: Commands) {
+pub fn init_people(names: Res<Names>, config: Res<Config>, mut commands: Commands) {
     // poor people
-    for _ in 0..100 {
+    for _ in 0..config.init.people.poor.value {
         commands.spawn((
             Person::default(),
             Name::new(people::generate_name(&names)),
@@ -277,7 +276,7 @@ pub fn init_people(names: Res<Names>, mut commands: Commands) {
         ));
     }
     // rich people
-    for _ in 0..10 {
+    for _ in 0..config.init.people.rich.value {
         commands.spawn((
             Person::default(),
             Name::new(people::generate_name(&names)),

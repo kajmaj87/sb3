@@ -1,13 +1,65 @@
 {
   "game": {
     "speed": {
-      "value": 0.0,
+      "value": 0.03125,
       "name": "Game Speed",
       "description": "How many seconds real time must pass to advance the simulation by one tick",
       "range": [
         0.0,
         10.0
       ]
+    }
+  },
+  "people": {
+    "max_buy_orders_per_day": {
+      "value": 3,
+      "name": "Max Buy Orders Per Day",
+      "description": "How many buy orders a person can place per day",
+      "range": [
+        0,
+        20
+      ]
+    },
+    "discount_rate": {
+      "value": 0.75,
+      "name": "Discount Rate",
+      "description": "How much people discount future gains. 0.75 means that a item is worth 75% of its utility in one month (30 days)",
+      "range": [
+        0.0,
+        1.0
+      ]
+    }
+  },
+  "init": {
+    "people": {
+      "poor": {
+        "value": 50,
+        "name": "Poor People",
+        "description": "How many poor people to start with",
+        "range": [
+          0,
+          1000
+        ]
+      },
+      "rich": {
+        "value": 9,
+        "name": "Rich People",
+        "description": "How many rich people to start with",
+        "range": [
+          0,
+          1000
+        ]
+      },
+      "poor_starting_money": {
+        "value": "20kCr",
+        "name": "Poor People Starting Money",
+        "description": "How much money poor people start with"
+      },
+      "rich_starting_money": {
+        "value": "1000kCr",
+        "name": "Rich People Starting Money",
+        "description": "How much money rich people start with"
+      }
     }
   }
 }

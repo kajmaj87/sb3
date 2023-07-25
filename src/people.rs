@@ -9,6 +9,7 @@ use serde::{Deserialize, Deserializer};
 use macros::measured;
 
 use crate::business::{BuyOrder, Inventory, ItemType, OrderType};
+use crate::config::Config;
 use crate::logs::LogEvent;
 use crate::stats::PriceHistory;
 use crate::ui::debug::Performance;
@@ -168,6 +169,7 @@ pub fn consume(mut people: Query<(Entity, &Name, &mut Person)>, items: Res<Items
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 #[measured]
 pub fn create_buy_orders_for_people(
     mut people: Query<(Entity, &Name, &Wallet, &mut Person)>,
@@ -176,6 +178,7 @@ pub fn create_buy_orders_for_people(
     items: Res<Items>,
     mut logs: EventWriter<LogEvent>,
     mut commands: Commands,
+    config: Res<Config>,
 ) {
     let mut rng = rand::thread_rng();
     for (buyer, name, _, mut person) in people.iter_mut() {
@@ -185,7 +188,7 @@ pub fn create_buy_orders_for_people(
         person
             .utility
             .push_front(utility(&needs, name, &total_assets, &price_history));
-        while item_buy_success_count < 5 {
+        while item_buy_success_count < config.people.max_buy_orders_per_day.value {
             match try_to_buy_item(
                 &needs,
                 &price_history,
@@ -196,6 +199,7 @@ pub fn create_buy_orders_for_people(
                 name,
                 &items,
                 &total_assets,
+                &config,
             ) {
                 Some(item) => {
                     *total_assets.entry(item).or_insert(0) += 1;
@@ -218,11 +222,13 @@ fn try_to_buy_item(
     name: &Name,
     items: &Items,
     total_assets: &HashMap<ItemType, u64>,
+    config: &Config,
 ) -> Option<ItemType> {
     let mut person_marginal_utilities: HashMap<ItemType, f64> = HashMap::new();
+    let d = config.people.discount_rate.value; // monthly discount rate
+    let d = (1.0 + d).powf(1.0 / 30.0) - 1.0; // daily discount rate
     for need in needs.needs.iter().flat_map(|(_, n)| n.satisfied_by.keys()) {
         let p = items.items.get(&need.name).unwrap().consumption_rate; // probability that item will be consumed
-        let d = 0.978; // future discount rate around 1/2 after a month
         let cumulation_factor = d * (1.0 - p) / (1.0 - d * (1.0 - p));
         let util =
             cumulation_factor * marginal_utility(needs, name, total_assets, price_history, need);

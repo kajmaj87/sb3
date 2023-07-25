@@ -56,6 +56,9 @@ fn main() {
         .insert_resource(people::Names::default())
         .insert_resource(people::Needs::default())
         .insert_resource(people::Items::default())
+        .insert_resource(ui::config::UiState {
+            open_settings_panel: ui::config::SettingsPanel::Init,
+        })
         .insert_resource(info)
         .insert_resource(ui::debug::Performance::new(100))
         .insert_resource(UiState {
@@ -135,6 +138,7 @@ fn main() {
                 ui::template::render_template_editor,
                 ui::prices::render_todays_prices,
                 ui::logs::render_logs,
+                ui::config::settings,
             ),
         )
         .add_systems(PostUpdate, turn_end_system)

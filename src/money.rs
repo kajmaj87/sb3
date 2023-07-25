@@ -1,14 +1,29 @@
+use bevy_egui::egui::emath::Numeric;
 use either::Either;
 use std::fmt;
 use std::iter::Sum;
 use std::ops::{Add, AddAssign, Div, Mul, MulAssign, Sub, SubAssign};
 use std::str::FromStr;
 
-use serde::de::Error as DeError;
-use serde::{Deserialize, Serialize};
+use serde::de::Visitor;
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
-#[derive(Deserialize, Serialize, Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Default)]
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Default)]
 pub struct Money(pub u64);
+
+impl Numeric for Money {
+    const INTEGRAL: bool = true;
+    const MIN: Self = Money(std::u64::MIN);
+    const MAX: Self = Money(std::u64::MAX);
+
+    fn to_f64(self) -> f64 {
+        self.0 as f64
+    }
+
+    fn from_f64(num: f64) -> Self {
+        Money(num as u64)
+    }
+}
 
 impl Add for Money {
     type Output = Self;
@@ -154,7 +169,7 @@ impl FromStr for Money {
     type Err = Box<dyn std::error::Error>;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.trim_end_matches(" Cr");
+        let s = s.trim_end_matches("Cr");
         let (multiplier, len_to_trim) = match s.chars().last().unwrap() {
             'k' => (1_000.0, 1),
             'M' => (1_000_000.0, 1),
@@ -173,42 +188,85 @@ impl FromStr for Money {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct MoneySerde(#[serde(deserialize_with = "money_from_str_or_num")] Money);
+struct MoneyVisitor;
 
-pub fn money_from_str_or_num<'de, D>(deserializer: D) -> Result<Money, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::de::Visitor;
+impl<'de> Visitor<'de> for MoneyVisitor {
+    type Value = Money;
 
-    struct MoneyVisitor;
-
-    impl<'de> Visitor<'de> for MoneyVisitor {
-        type Value = Money;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("a string or number")
-        }
-
-        fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-        where
-            E: DeError,
-        {
-            Money::from_str(value).map_err(DeError::custom)
-        }
-
-        fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
-        where
-            E: DeError,
-        {
-            Ok(Money(value))
-        }
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a string or number representing money")
     }
 
-    deserializer.deserialize_any(MoneyVisitor)
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Money::from_str(value).map_err(de::Error::custom)
+    }
+
+    fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+    where
+        E: de::Error,
+    {
+        Ok(Money(value))
+    }
 }
+
+impl<'de> Deserialize<'de> for Money {
+    fn deserialize<D>(deserializer: D) -> Result<Money, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_any(MoneyVisitor)
+    }
+}
+
+impl Serialize for Money {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let s = self.to_string();
+        serializer.serialize_str(&s)
+    }
+}
+
+// #[derive(Serialize, Deserialize)]
+// #[serde(transparent)]
+// pub struct MoneySerde(#[serde(deserialize_with = "money_from_str_or_num")] Money);
+//
+// pub fn money_from_str_or_num<'de, D>(deserializer: D) -> Result<Money, D::Error>
+// where
+//     D: serde::Deserializer<'de>,
+// {
+//     use serde::de::Visitor;
+//
+//     struct MoneyVisitor;
+//
+//     impl<'de> Visitor<'de> for MoneyVisitor {
+//         type Value = Money;
+//
+//         fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+//             formatter.write_str("a string or number")
+//         }
+//
+//         fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+//         where
+//             E: DeError,
+//         {
+//             Money::from_str(value).map_err(DeError::custom)
+//         }
+//
+//         fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+//         where
+//             E: DeError,
+//         {
+//             Ok(Money(value))
+//         }
+//     }
+//
+//     deserializer.deserialize_any(MoneyVisitor)
+// }
 
 /// A type alias to represent financial change in terms of cost (outgoing money)
 /// or gain (incoming money). Costs are represented as `Either::Left` and gains

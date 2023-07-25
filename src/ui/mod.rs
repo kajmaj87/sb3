@@ -1,3 +1,4 @@
+pub mod config;
 pub mod debug;
 pub mod logs;
 pub mod main_layout;
