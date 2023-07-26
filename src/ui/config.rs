@@ -7,7 +7,7 @@ use bevy_egui::{
 };
 use enum_display_derive::Display;
 
-use crate::config::{Config, ConfigValue, CONFIG_PATH};
+use crate::config::{Config, ConfigValue, CONFIG_PATH, DEFAULT_CONFIG_PATH};
 
 #[derive(PartialEq, Eq, Display)]
 pub enum SettingsPanel {
@@ -39,8 +39,13 @@ pub fn settings(
             add_settings_panel(ui, &mut state.open_settings_panel, SettingsPanel::People);
             add_settings_panel(ui, &mut state.open_settings_panel, SettingsPanel::Business);
             add_settings_panel(ui, &mut state.open_settings_panel, SettingsPanel::Goverment);
-            let space_left = ui.available_size() - egui::Vec2 { x: 45.0, y: 0.0 };
+            let space_left = ui.available_size() - egui::Vec2 { x: 100.0, y: 0.0 };
             ui.allocate_space(space_left);
+            if ui.button("Default").clicked() {
+                let data = fs::read_to_string(DEFAULT_CONFIG_PATH).expect("Unable to read config file");
+                let default_config: Config = serde_json::from_str(&data).expect("Unable to parse config file");
+                *config = default_config;
+            }
             if ui.button("Save").clicked() {
                 let file_content = serde_json::to_string_pretty(config.as_ref())
                     .expect("Unable to serialize configuration for saving!");
@@ -60,7 +65,7 @@ pub fn settings(
                     draw_config_value(ui, &mut config.people.max_buy_orders_per_day);
                     draw_config_value(ui, &mut config.people.discount_rate);
                 }),
-            SettingsPanel::Business =>  add_options_grid(ui, |ui| {
+            SettingsPanel::Business => add_options_grid(ui, |ui| {
                 draw_config_value(ui, &mut config.business.prices.max_change_per_day);
                 draw_config_value(ui, &mut config.business.prices.sell_history_to_consider);
                 draw_config_value(ui, &mut config.business.goal_produced_cycles_count);

@@ -1,10 +1,13 @@
 use std::fs;
+use std::fs::{copy, create_dir_all, metadata};
+use std::path::Path;
 
 use crate::money::Money;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-pub const CONFIG_PATH: &str = "./data/config.json";
+pub const DEFAULT_CONFIG_PATH: &str = "./data/config.json";
+pub const CONFIG_PATH: &str = "./run/config.json";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PeopleInit {
@@ -83,9 +86,42 @@ pub struct ConfigPlugin;
 
 impl Plugin for ConfigPlugin {
     fn build(&self, app: &mut App) {
-        let data = fs::read_to_string(CONFIG_PATH).expect("Unable to read config file");
+        let config_path = Path::new(CONFIG_PATH);
+        let default_config_path = Path::new(DEFAULT_CONFIG_PATH);
+
+        // Create directory if it does not exist
+        if let Some(parent) = config_path.parent() {
+            create_dir_all(parent).expect("Unable to create config directory");
+        }
+
+        let read_default = if !config_path.exists() {
+            true
+        } else {
+            let config_metadata =
+                metadata(config_path).expect("Unable to read config file metadata");
+            let default_config_metadata =
+                metadata(default_config_path).expect("Unable to read default config file metadata");
+
+            default_config_metadata
+                .modified()
+                .expect("Unable to get default config file modification time")
+                > config_metadata
+                    .modified()
+                    .expect("Unable to get config file modification time")
+        };
+
+        if read_default {
+            copy(default_config_path, config_path)
+                .expect("Unable to copy default config to config");
+        }
+
+        let data = fs::read_to_string(config_path).expect("Unable to read config file");
         let config: Config = serde_json::from_str(&data).expect("Unable to parse config file");
         debug!("Read configuration: {:?}", config);
         app.insert_resource(config);
     }
+    // let data = fs::read_to_string(CONFIG_PATH).expect("Unable to read config file");
+    // let config: Config = serde_json::from_str(&data).expect("Unable to parse config file");
+    // debug!("Read configuration: {:?}", config);
+    // app.insert_resource(config);
 }
