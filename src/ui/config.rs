@@ -41,7 +41,7 @@ pub fn settings(
             add_settings_panel(ui, &mut state.open_settings_panel, SettingsPanel::Government);
             let space_left = ui.available_size() - egui::Vec2 { x: 100.0, y: 0.0 };
             ui.allocate_space(space_left);
-            if ui.button("Default").clicked() {
+            if ui.button("Default").on_hover_text("Restore default config (won't save until you click Save)").clicked() {
                 let data = fs::read_to_string(DEFAULT_CONFIG_PATH).expect("Unable to read config file");
                 let default_config: Config = serde_json::from_str(&data).expect("Unable to parse config file");
                 *config = default_config;

@@ -127,7 +127,7 @@
       ]
     }
   },
-  "goverment": {
+  "government": {
     "min_time_between_business_creation": {
       "value": 30,
       "name": "Min Time Between Business Creation",
