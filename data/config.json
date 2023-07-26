@@ -28,6 +28,114 @@
         0.0,
         1.0
       ]
+    },
+    "order_expiration_time": {
+      "value": 1,
+      "name": "Order Expiration Time",
+      "description": "How many days until a placed order expires",
+      "range": [
+        1,
+        10
+      ]
+    }
+  },
+  "business": {
+    "prices": {
+      "sell_history_to_consider": {
+        "value": 30,
+        "name": "Sell History to Consider in Extreme Demand Calculation",
+        "description": "How many days of sell history to consider when creating new business. This is used to evaluate if given business has high demand. Demand is considered 'extreme' if sum of sell orders executed in this many last days is greater than current sell orders.",
+        "range": [
+          1,
+          360
+        ]
+      },
+      "max_change_per_day": {
+        "value": 0.1,
+        "name": "Max Price Change Per Day",
+        "description": "Maximum allowable change in price per day, as a fraction of the current price",
+        "range": [
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "market": {
+      "amount_of_sell_orders_seen": {
+        "value": 0.1,
+        "name": "Amount of Sell Orders Seen",
+        "description": "How many sell orders any buyers sees, as a fraction of the total sell orders. This is to introduce some randomness in the market, so that not all buyers see the same prices.",
+        "range": [
+          0.0,
+          1.0
+        ]
+      },
+      "amount_of_sell_orders_to_choose_best_price_from": {
+        "value": 0.2,
+        "name": "Buyer irrationanality",
+        "description": "Value of 0 means complete rationallity, value of 1.0 means complete randomness. Buyer will take this amount of orders from orders seen and choose one at random (sorted by price). This is to introduce some randomness in the market, so that not all buyers act rationally, this simulates that buyers take other factors into account, not price only",
+        "range": [
+          0.0,
+          1.0
+        ]
+      }
+    },
+    "keep_resources_for_cycles_amount": {
+      "value": 5,
+      "name": "Keep Resources For Cycles Amount",
+      "description": "How many cycles' worth of resources a business should aim to keep in inventory",
+      "range": [
+        1,
+        10
+      ]
+    },
+    "money_to_create_business": {
+      "value": "100kCr",
+      "name": "Money to Create Business",
+      "description": "How much money is required to create a new business. All of this money will be transferred from new owner to his new business"
+    },
+    "new_worker_salary": {
+      "value": "1kCr",
+      "name": "New Worker Salary",
+      "description": "Starting salary for a new worker at a business"
+    },
+    "monthly_dividend": {
+      "value": 0.02,
+      "name": "Monthly Dividend",
+      "description": "Monthly dividend rate for a business, as a fraction of profits",
+      "range": [
+        0.0,
+        1.0
+      ]
+    },
+    "min_days_between_staff_change": {
+      "value": 7,
+      "name": "Minimum Days Between Staff Changes",
+      "description": "Minimum number of days a business must wait between changing staff levels. This affects both hiring and firing people. Firing will still happen if business cannot pay the workers when almost bankrupt.",
+      "range": [
+        1,
+        360
+      ]
+    },
+    "goal_produced_cycles_count": {
+      "value": 10,
+      "name": "Goal Produced Cycles Count",
+      "description": "Goal number of production cycles for a business to keep in buy orders. After crossing this threshold business will reduce amount of workers hired to reduce output.",
+      "range": [
+        0,
+        100
+      ]
+    }
+  },
+  "goverment": {
+    "min_time_between_business_creation": {
+      "value": 30,
+      "name": "Min Time Between Business Creation",
+      "description": "Minimum number of days that must pass before a new business can be created. This does not cumulate, so business spamming will not occur after a longer pause of business creation.",
+      "range": [
+        1,
+        360
+      ]
     }
   },
   "init": {

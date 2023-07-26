@@ -13,6 +13,8 @@ use crate::config::{Config, ConfigValue, CONFIG_PATH};
 pub enum SettingsPanel {
     Init,
     People,
+    Business,
+    Goverment,
 }
 
 #[derive(Resource)]
@@ -35,6 +37,8 @@ pub fn settings(
         ui.horizontal(|ui| {
             add_settings_panel(ui, &mut state.open_settings_panel, SettingsPanel::Init);
             add_settings_panel(ui, &mut state.open_settings_panel, SettingsPanel::People);
+            add_settings_panel(ui, &mut state.open_settings_panel, SettingsPanel::Business);
+            add_settings_panel(ui, &mut state.open_settings_panel, SettingsPanel::Goverment);
             let space_left = ui.available_size() - egui::Vec2 { x: 45.0, y: 0.0 };
             ui.allocate_space(space_left);
             if ui.button("Save").clicked() {
@@ -56,6 +60,21 @@ pub fn settings(
                     draw_config_value(ui, &mut config.people.max_buy_orders_per_day);
                     draw_config_value(ui, &mut config.people.discount_rate);
                 }),
+            SettingsPanel::Business =>  add_options_grid(ui, |ui| {
+                draw_config_value(ui, &mut config.business.prices.max_change_per_day);
+                draw_config_value(ui, &mut config.business.prices.sell_history_to_consider);
+                draw_config_value(ui, &mut config.business.goal_produced_cycles_count);
+                draw_config_value(ui, &mut config.business.keep_resources_for_cycles_amount);
+                draw_config_value(ui, &mut config.business.min_days_between_staff_change);
+                draw_config_value(ui, &mut config.business.money_to_create_business);
+                draw_config_value(ui, &mut config.business.monthly_dividend);
+                draw_config_value(ui, &mut config.business.new_worker_salary);
+                draw_config_value(ui, &mut config.business.market.amount_of_sell_orders_seen);
+                draw_config_value(ui, &mut config.business.market.amount_of_sell_orders_to_choose_best_price_from);
+            }),
+            SettingsPanel::Goverment => add_options_grid(ui, |ui| {
+                draw_config_value(ui, &mut config.goverment.min_time_between_business_creation);
+            })
         }
     });
 }

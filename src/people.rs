@@ -245,6 +245,7 @@ fn try_to_buy_item(
             name,
             &mut person_marginal_utilities,
             money_utility,
+            config,
         ) {
             Some(value)
         } else {
@@ -254,6 +255,7 @@ fn try_to_buy_item(
                 buyer,
                 name,
                 &mut person_marginal_utilities,
+                config,
             )
         }
     } else {
@@ -263,6 +265,7 @@ fn try_to_buy_item(
             buyer,
             name,
             &mut person_marginal_utilities,
+            config,
         )
     }
 }
@@ -273,6 +276,7 @@ fn create_buy_order_without_money_utlity(
     buyer: Entity,
     name: &Name,
     person_marginal_utilities: &mut HashMap<ItemType, f64>,
+    config: &Config,
 ) -> Option<ItemType> {
     let biggest_marginal_utility_item_type = person_marginal_utilities
         .iter()
@@ -285,7 +289,7 @@ fn create_buy_order_without_money_utlity(
         buyer,
         name,
         biggest_marginal_utility_item_type,
-        1,
+        config.people.order_expiration_time.value,
     ))
 }
 
@@ -299,6 +303,7 @@ fn create_buy_order_with_money_utility(
     name: &Name,
     person_marginal_utilities: &mut HashMap<ItemType, f64>,
     money_utility: f64,
+    config: &Config,
 ) -> Option<ItemType> {
     debug!("Money utility for {} is {}", name, money_utility);
     let utilities_with_prices = calculate_marginal_utilities_adjusted_by_prices(
@@ -335,7 +340,14 @@ fn create_buy_order_with_money_utility(
     let (item_type, _util) = utilities[index];
 
     trace!("Chosen item for person {} is {}", name, item_type.name);
-    Some(create_buy_order(logs, commands, buyer, name, item_type, 1))
+    Some(create_buy_order(
+        logs,
+        commands,
+        buyer,
+        name,
+        item_type,
+        config.people.order_expiration_time.value,
+    ))
 }
 
 fn create_buy_order(

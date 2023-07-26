@@ -11,6 +11,7 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
+use crate::config::Config;
 use macros::measured;
 
 use crate::govement::BusinessPermit;
@@ -518,6 +519,7 @@ pub fn create_business(
     mut commands: Commands,
     mut logs: EventWriter<LogEvent>,
     date: Res<Days>,
+    config: Res<Config>,
 ) {
     let demand = buy_orders
         .iter()
@@ -532,7 +534,7 @@ pub fn create_business(
     if unemployed == 0 {
         return;
     }
-    let last_days = 10;
+    let last_days = config.business.prices.sell_history_to_consider.value;
     let sells_in_last_days =
         manufacturers
             .iter()
@@ -574,11 +576,18 @@ pub fn create_business(
                             },
                             Name::new(format!("{} factory", cycle.output.0.as_str())),
                             SellStrategy {
-                                max_price_change_per_day: 0.05,
+                                max_price_change_per_day: config
+                                    .business
+                                    .prices
+                                    .max_change_per_day
+                                    .value,
                                 ..Default::default()
                             },
                             BuyStrategy {
-                                target_production_cycles: 10,
+                                target_production_cycles: config
+                                    .business
+                                    .keep_resources_for_cycles_amount
+                                    .value,
                                 ..Default::default()
                             },
                         ))
@@ -590,7 +599,7 @@ pub fn create_business(
                                 side: TradeSide::Pay,
                                 sender: entity,
                                 receiver: business_id,
-                                amount: Money::from_str("100k").unwrap(),
+                                amount: config.business.money_to_create_business.value,
                                 date: date.days,
                             },
                             &mut logs,
@@ -656,6 +665,8 @@ fn choose_best_business<'a>(
         }).max_by_key(|(_, count)| *count).map(|(cycle, _)| cycle)
 }
 
+#[allow(clippy::too_many_arguments)]
+#[measured]
 pub fn bankruption(
     manufacturers: Query<(Entity, &Name, &Manufacturer)>,
     mut wallets: Query<&mut Wallet>,
@@ -664,12 +675,13 @@ pub fn bankruption(
     mut logs: EventWriter<LogEvent>,
     mut commands: Commands,
     date: Res<Days>,
+    config: Res<Config>,
 ) {
     for (entity, name, manufacturer) in manufacturers.iter() {
         // TODO change to something better after implementing better job market system
         let [mut manufacturer_wallet, mut owner_wallet] =
             wallets.get_many_mut([entity, manufacturer.owner]).unwrap();
-        if manufacturer_wallet.money() < Money(500) {
+        if manufacturer_wallet.money() < config.business.new_worker_salary.value {
             info!("{} is bankrupt", name.as_str());
             sell_orders
                 .iter_mut()
@@ -716,8 +728,9 @@ pub fn payout_dividends(
     mut wallets: Query<&mut Wallet>,
     mut logs: EventWriter<LogEvent>,
     date: Res<Days>,
+    config: Res<Config>,
 ) {
-    let dividend = 0.1 / 30.0;
+    let dividend = config.business.monthly_dividend.value;
     for (owned_business, manufacturer) in manufacturers.iter() {
         let [mut manufacturer_wallet, mut owner_wallet] = wallets
             .get_many_mut([owned_business, manufacturer.owner])
@@ -771,6 +784,7 @@ pub fn create_job_offers(
     jobs: Query<&JobOffer>,
     mut logs: EventWriter<LogEvent>,
     mut commands: Commands,
+    config: Res<Config>,
 ) {
     for (manufacturer, manufacturer_data, sell_strategy) in manufacturers.iter_mut() {
         let total_offers = jobs
@@ -784,7 +798,7 @@ pub fn create_job_offers(
             && total_offers == 0
             && manufacturer_data.days_since_last_staff_change == 0
         {
-            let salary = Money(500);
+            let salary = config.business.new_worker_salary.value;
             commands.spawn(JobOffer {
                 salary,
                 employer: manufacturer,
@@ -814,6 +828,7 @@ pub fn take_job_offers(
     mut manufacturers: Query<(Entity, &mut Manufacturer)>,
     mut logs: EventWriter<LogEvent>,
     mut commands: Commands,
+    config: Res<Config>,
 ) {
     let mut unemployed: Vec<(Entity, &Person)> = unemployed.iter().collect();
     for (job, offer) in jobs.iter() {
@@ -823,7 +838,8 @@ pub fn take_job_offers(
                 let worker_name = names.get(person).unwrap();
                 let manufacturer_name = names.get(manufacturer_entity).unwrap();
                 manufacturer.hired_workers.push(person);
-                manufacturer.days_since_last_staff_change = 30;
+                manufacturer.days_since_last_staff_change =
+                    config.business.min_days_between_staff_change.value;
                 commands.entity(person).insert(Worker {
                     salary: offer.salary,
                     employed_at: Some(offer.employer),
@@ -864,6 +880,7 @@ pub fn fire_staff(
     names: Query<&Name>,
     mut logs: EventWriter<LogEvent>,
     mut commands: Commands,
+    config: Res<Config>,
 ) {
     let sell_orders_count_grouped_by_manufacturer = sell_orders
         .iter()
@@ -879,13 +896,15 @@ pub fn fire_staff(
                 || (sell_orders_count_grouped_by_manufacturer
                     .get(&manufacturer)
                     .unwrap_or(&0)
-                    > &(manufacturer_data.production_cycle.output.1 * 30)))
+                    > &(manufacturer_data.production_cycle.output.1
+                        * config.business.goal_produced_cycles_count.value)))
         {
             let worker = manufacturer_data.hired_workers.pop();
             if let Some(worker) = worker {
                 let worker_name = names.get(worker).unwrap();
                 let manufacturer_name = names.get(manufacturer).unwrap();
-                manufacturer_data.days_since_last_staff_change = 30;
+                manufacturer_data.days_since_last_staff_change =
+                    config.business.min_days_between_staff_change.value;
                 logs.send(LogEvent::Generic {
                     text: format!("I fired a worker {}!", worker_name),
                     entity: manufacturer,
@@ -1037,6 +1056,7 @@ pub fn execute_orders(
     mut manufacturers: Query<(Entity, &mut Manufacturer)>,
     mut people: Query<(Entity, &mut Person)>,
     date: Res<Days>,
+    config: Res<Config>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -1054,7 +1074,9 @@ pub fn execute_orders(
 
         if !matching_sell_orders.is_empty() {
             // Take a random sample
-            let sample_size = (matching_sell_orders.len() as f64 * 0.1).ceil() as usize; // 10% for example
+            let sample_size = (matching_sell_orders.len() as f64
+                * config.business.market.amount_of_sell_orders_seen.value)
+                .ceil() as usize; // 10% for example
             let sampled_orders: Vec<_> = choose_weighted_orders(&matching_sell_orders, sample_size);
 
             // Sort by price ascending
@@ -1073,7 +1095,13 @@ pub fn execute_orders(
                     .join(", ")
             );
             // randomly get one of the top 25% of prices
-            let p = rng.gen_range(0.0..=0.10);
+            let p = rng.gen_range(
+                0.0..=config
+                    .business
+                    .market
+                    .amount_of_sell_orders_to_choose_best_price_from
+                    .value,
+            );
             let index = ((sorted_sample.len() - 1) as f64 * p).round() as usize;
             if index >= sorted_sample.len() {
                 panic!(

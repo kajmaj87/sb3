@@ -28,12 +28,44 @@ pub struct GameConfig {
 pub struct People {
     pub max_buy_orders_per_day: ConfigValue<u32>,
     pub discount_rate: ConfigValue<f64>,
+    pub order_expiration_time: ConfigValue<u64>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Prices {
+    pub sell_history_to_consider: ConfigValue<usize>,
+    pub max_change_per_day: ConfigValue<f32>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Market {
+    pub amount_of_sell_orders_seen: ConfigValue<f64>,
+    pub amount_of_sell_orders_to_choose_best_price_from: ConfigValue<f64>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Goverment {
+    pub min_time_between_business_creation: ConfigValue<usize>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Business {
+    pub prices: Prices,
+    pub market: Market,
+    pub keep_resources_for_cycles_amount: ConfigValue<u32>,
+    pub money_to_create_business: ConfigValue<Money>,
+    pub new_worker_salary: ConfigValue<Money>,
+    pub monthly_dividend: ConfigValue<f32>,
+    pub min_days_between_staff_change: ConfigValue<u32>,
+    pub goal_produced_cycles_count: ConfigValue<u32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Resource)]
 pub struct Config {
     pub game: GameConfig,
     pub people: People,
+    pub business: Business,
+    pub goverment: Goverment,
     pub init: Init,
 }
 
