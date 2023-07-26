@@ -12,7 +12,7 @@ pub fn create_business_permit(
     config: Res<Config>,
 ) {
     if permits.iter().count() == 0
-        && date.days % config.goverment.min_time_between_business_creation.value == 1
+        && date.days % config.government.min_time_between_business_creation.value == 1
     {
         commands.spawn(BusinessPermit {});
     }

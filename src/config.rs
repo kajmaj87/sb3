@@ -47,7 +47,7 @@ pub struct Market {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Goverment {
+pub struct Government {
     pub min_time_between_business_creation: ConfigValue<usize>,
 }
 
@@ -68,7 +68,7 @@ pub struct Config {
     pub game: GameConfig,
     pub people: People,
     pub business: Business,
-    pub goverment: Goverment,
+    pub government: Government,
     pub init: Init,
 }
 
@@ -120,8 +120,4 @@ impl Plugin for ConfigPlugin {
         debug!("Read configuration: {:?}", config);
         app.insert_resource(config);
     }
-    // let data = fs::read_to_string(CONFIG_PATH).expect("Unable to read config file");
-    // let config: Config = serde_json::from_str(&data).expect("Unable to parse config file");
-    // debug!("Read configuration: {:?}", config);
-    // app.insert_resource(config);
 }

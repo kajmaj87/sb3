@@ -14,7 +14,7 @@ pub enum SettingsPanel {
     Init,
     People,
     Business,
-    Goverment,
+    Government,
 }
 
 #[derive(Resource)]
@@ -38,7 +38,7 @@ pub fn settings(
             add_settings_panel(ui, &mut state.open_settings_panel, SettingsPanel::Init);
             add_settings_panel(ui, &mut state.open_settings_panel, SettingsPanel::People);
             add_settings_panel(ui, &mut state.open_settings_panel, SettingsPanel::Business);
-            add_settings_panel(ui, &mut state.open_settings_panel, SettingsPanel::Goverment);
+            add_settings_panel(ui, &mut state.open_settings_panel, SettingsPanel::Government);
             let space_left = ui.available_size() - egui::Vec2 { x: 100.0, y: 0.0 };
             ui.allocate_space(space_left);
             if ui.button("Default").clicked() {
@@ -77,8 +77,8 @@ pub fn settings(
                 draw_config_value(ui, &mut config.business.market.amount_of_sell_orders_seen);
                 draw_config_value(ui, &mut config.business.market.amount_of_sell_orders_to_choose_best_price_from);
             }),
-            SettingsPanel::Goverment => add_options_grid(ui, |ui| {
-                draw_config_value(ui, &mut config.goverment.min_time_between_business_creation);
+            SettingsPanel::Government => add_options_grid(ui, |ui| {
+                draw_config_value(ui, &mut config.government.min_time_between_business_creation);
             })
         }
     });
