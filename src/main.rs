@@ -117,6 +117,7 @@ fn main() {
                 government::create_business_permit,
                 people::consume,
                 people::create_buy_orders_for_people,
+                business::pay_cit.run_if(next_month),
                 stats::add_sell_orders_to_history,
             )
                 .chain()

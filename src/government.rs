@@ -8,6 +8,11 @@ pub struct BusinessPermit {}
 #[derive(Component, Default)]
 pub struct Government {}
 
+#[derive(Component)]
+pub struct TaxAuthority {
+    pub authority: Entity,
+}
+
 pub fn create_business_permit(
     mut commands: Commands,
     permits: Query<&BusinessPermit>,

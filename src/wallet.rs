@@ -174,7 +174,6 @@ pub enum TransactionError {
 pub struct Wallet {
     money: Money,
     pub(crate) transactions: VecDeque<Transaction>,
-    pub tax_authority: Option<Entity>,
 }
 
 impl Wallet {
@@ -182,7 +181,6 @@ impl Wallet {
         Self {
             money,
             transactions: VecDeque::new(),
-            tax_authority: None,
         }
     }
 

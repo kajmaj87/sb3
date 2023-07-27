@@ -5,7 +5,7 @@ use std::fmt::Display;
 use std::str::FromStr;
 
 use bevy::prelude::*;
-use either::Either;
+use either::{Either, Right};
 use rand::distributions::{Distribution, WeightedIndex};
 use rand::seq::SliceRandom;
 use rand::Rng;
@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::Config;
 use macros::measured;
 
-use crate::government::BusinessPermit;
+use crate::government::{BusinessPermit, Government, TaxAuthority};
 use crate::init::{ProductionCycleTemplate, Templates};
 use crate::logs::LogEvent;
 use crate::money::Money;
@@ -513,6 +513,7 @@ pub fn create_business(
     mut wallets: Query<&mut Wallet>,
     workers: Query<&Worker>,
     templates: Res<Templates>,
+    govenrments: Query<(Entity, &Government)>,
     business_permits: Query<(Entity, &BusinessPermit)>,
     manufacturers: Query<(Entity, &Manufacturer)>,
     buy_orders: Query<&BuyOrder>,
@@ -521,6 +522,10 @@ pub fn create_business(
     date: Res<Days>,
     config: Res<Config>,
 ) {
+    let (governor, _) = govenrments
+        .iter()
+        .next()
+        .expect("There should be a government");
     let demand = buy_orders
         .iter()
         .fold(HashMap::new(), |mut acc, buy_order| {
@@ -589,6 +594,9 @@ pub fn create_business(
                                     .keep_resources_for_cycles_amount
                                     .value,
                                 ..Default::default()
+                            },
+                            TaxAuthority {
+                                authority: governor,
                             },
                         ))
                         .id();
@@ -746,6 +754,38 @@ pub fn payout_dividends(
                             sender: owned_business,
                             receiver: manufacturer.owner,
                             amount: money * dividend,
+                            date: date.days,
+                        },
+                        &mut logs,
+                    )
+                    .unwrap();
+            }
+        }
+    }
+}
+
+pub fn pay_cit(
+    manufacturers: Query<(Entity, &Manufacturer)>,
+    tax_authorities: Query<&TaxAuthority>,
+    mut wallets: Query<&mut Wallet>,
+    mut logs: EventWriter<LogEvent>,
+    date: Res<Days>,
+    config: Res<Config>,
+) {
+    for (entity, _) in manufacturers.iter() {
+        let tax_authority = tax_authorities.get(entity).unwrap();
+        if let Ok([mut manufacturer_wallet, mut tax_authority_wallet]) =
+            wallets.get_many_mut([entity, tax_authority.authority])
+        {
+            if let Right(gain) = manufacturer_wallet.calculate_total_change(date.days, 30) {
+                manufacturer_wallet
+                    .transaction(
+                        &mut tax_authority_wallet,
+                        &Transaction::Transfer {
+                            side: TradeSide::Pay,
+                            sender: entity,
+                            receiver: tax_authority.authority,
+                            amount: gain * config.government.taxes.cit.value,
                             date: date.days,
                         },
                         &mut logs,

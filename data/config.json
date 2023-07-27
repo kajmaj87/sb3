@@ -149,7 +149,7 @@
       },
       "pit": {
         "value": 0.1,
-        "name": "PIT",
+        "name": "PIT (NOT IMPLEMENTED)",
         "description": "Personal Income Tax.\n\nThis is a tax on incomes of workers. It is paid monthly, and is calculated as a fraction of incomes such as salaries or dividends.",
         "range": [
           0.0,
