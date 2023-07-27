@@ -55,10 +55,15 @@ pub fn settings(
         ui.separator();
         match state.open_settings_panel {
             SettingsPanel::Init => add_options_grid(ui, |ui| {
-                draw_config_value(ui, &mut config.init.people.poor);
-                draw_config_value(ui, &mut config.init.people.rich);
-                draw_config_value(ui, &mut config.init.people.poor_starting_money);
-                draw_config_value(ui, &mut config.init.people.rich_starting_money);
+                ui.collapsing("People", |ui| {
+                    draw_config_value(ui, &mut config.init.people.poor);
+                    draw_config_value(ui, &mut config.init.people.rich);
+                    draw_config_value(ui, &mut config.init.people.poor_starting_money);
+                    draw_config_value(ui, &mut config.init.people.rich_starting_money);
+                });
+                ui.collapsing("Government", |ui| {
+                    draw_config_value(ui, &mut config.init.government.starting_money);
+                });
             }),
             SettingsPanel::People =>
                 add_options_grid(ui, |ui| {
@@ -79,6 +84,10 @@ pub fn settings(
             }),
             SettingsPanel::Government => add_options_grid(ui, |ui| {
                 draw_config_value(ui, &mut config.government.min_time_between_business_creation);
+                ui.collapsing("Taxes" ,|ui| {
+                    draw_config_value(ui, &mut config.government.taxes.cit);
+                    draw_config_value(ui, &mut config.government.taxes.pit);
+                });
             })
         }
     });

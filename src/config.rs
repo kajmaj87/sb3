@@ -18,8 +18,14 @@ pub struct PeopleInit {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct GovernmentInit {
+    pub starting_money: ConfigValue<Money>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Init {
     pub people: PeopleInit,
+    pub government: GovernmentInit,
 }
 
 #[derive(Serialize, Deserialize, Debug, Component)]
@@ -47,8 +53,15 @@ pub struct Market {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct Taxes {
+    pub cit: ConfigValue<f32>,
+    pub pit: ConfigValue<f32>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Government {
     pub min_time_between_business_creation: ConfigValue<usize>,
+    pub taxes: Taxes,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -85,6 +98,7 @@ pub struct ConfigValue<T> {
 pub struct ConfigPlugin;
 
 impl Plugin for ConfigPlugin {
+    // default config is read if config file does not exist or is older than default config
     fn build(&self, app: &mut App) {
         let config_path = Path::new(CONFIG_PATH);
         let default_config_path = Path::new(DEFAULT_CONFIG_PATH);

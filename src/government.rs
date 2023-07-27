@@ -5,6 +5,9 @@ use bevy::prelude::{Commands, Res, *};
 #[derive(Component)]
 pub struct BusinessPermit {}
 
+#[derive(Component, Default)]
+pub struct Government {}
+
 pub fn create_business_permit(
     mut commands: Commands,
     permits: Query<&BusinessPermit>,

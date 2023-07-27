@@ -14,6 +14,7 @@ use crate::business::{
     SellStrategy, Worker,
 };
 use crate::config::Config;
+use crate::government::Government;
 use crate::money::Money;
 use crate::people;
 use crate::people::{Items, Person};
@@ -283,6 +284,14 @@ pub fn init_people(names: Res<Names>, config: Res<Config>, mut commands: Command
             Wallet::new(Money(1_000_000)),
         ));
     }
+}
+
+pub fn init_governments(mut commands: Commands, config: Res<Config>) {
+    commands.spawn((
+        Government::default(),
+        Name::new("Planetary Governor".to_string()),
+        Wallet::new(config.init.government.starting_money.value),
+    ));
 }
 
 pub fn init_manufacturers(

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::config::Config;
 use macros::measured;
 
-use crate::govement::BusinessPermit;
+use crate::government::BusinessPermit;
 use crate::init::{ProductionCycleTemplate, Templates};
 use crate::logs::LogEvent;
 use crate::money::Money;

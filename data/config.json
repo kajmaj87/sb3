@@ -136,6 +136,26 @@
         1,
         360
       ]
+    },
+    "taxes": {
+      "cit": {
+        "value": 0.1,
+        "name": "CIT",
+        "description": "Corporate Income Tax.\n\nThis is a tax on profits of a business. It is paid monthly, and is calculated as a fraction of profits.",
+        "range": [
+          0.0,
+          1.0
+        ]
+      },
+      "pit": {
+        "value": 0.1,
+        "name": "PIT",
+        "description": "Personal Income Tax.\n\nThis is a tax on incomes of workers. It is paid monthly, and is calculated as a fraction of incomes such as salaries or dividends.",
+        "range": [
+          0.0,
+          1.0
+        ]
+      }
     }
   },
   "init": {
@@ -167,6 +187,13 @@
         "value": "1000kCr",
         "name": "Rich People Starting Money",
         "description": "How much money rich people start with"
+      }
+    },
+    "government": {
+      "starting_money": {
+        "value": "10MCr",
+        "name": "Starting Money",
+        "description": "How much money the government starts with"
       }
     }
   }

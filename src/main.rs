@@ -17,7 +17,7 @@ use crate::ui::logs::LoggingFilterType;
 mod business;
 mod commands;
 mod config;
-mod govement;
+mod government;
 mod init;
 mod invariants;
 mod logs;
@@ -46,11 +46,7 @@ fn main() {
             level: bevy::log::Level::WARN,
         }))
         .add_plugins((EguiPlugin, config::ConfigPlugin, FrameTimeDiagnosticsPlugin))
-        .insert_resource(Days {
-            days: 0,
-            next_turn: false,
-            last_update: 0.0,
-        })
+        .insert_resource(Days::default())
         .insert_resource(stats::PriceHistory::default())
         .insert_resource(init::Templates::default())
         .insert_resource(people::Names::default())
@@ -86,6 +82,7 @@ fn main() {
                 init::init_templates,
                 init::init_manufacturers,
                 init::init_people,
+                init::init_governments,
             )
                 .chain(),
         )
@@ -115,9 +112,9 @@ fn main() {
                 business::take_job_offers,
                 business::update_sell_strategy_margin,
                 business::update_sell_order_prices,
-                business::payout_dividends,
+                business::payout_dividends.run_if(next_month),
                 business::reduce_days_since_last_staff_change,
-                govement::create_business_permit,
+                government::create_business_permit,
                 people::consume,
                 people::create_buy_orders_for_people,
                 stats::add_sell_orders_to_history,
@@ -158,11 +155,13 @@ fn main() {
         .run();
 }
 
-#[derive(Resource)]
+#[derive(Resource, Default)]
 pub struct Days {
     days: usize,
     next_turn: bool,
     last_update: f32,
+    months: usize,
+    next_month: bool,
 }
 
 impl Days {
@@ -170,6 +169,13 @@ impl Days {
         self.days += 1;
         self.next_turn = true;
         self.last_update = time.elapsed_seconds();
+        if self.days % 30 == 0 {
+            info!("Month {} started", self.days / 30);
+            self.months += 1;
+            self.next_month = true;
+        } else {
+            self.next_month = false;
+        }
     }
 }
 
@@ -191,4 +197,8 @@ fn turn_end_system(mut days: ResMut<Days>) {
 
 fn next_turn(days: Res<Days>) -> bool {
     days.next_turn
+}
+
+fn next_month(days: Res<Days>) -> bool {
+    days.next_month
 }
